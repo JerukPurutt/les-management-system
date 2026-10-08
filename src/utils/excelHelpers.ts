@@ -18,6 +18,7 @@ export interface ParsedGuruRow {
   alamat: string;
   noTelp: string;
   jenjang: Jenjang;
+  jenjangList: Jenjang[];
 }
 
 /**
@@ -32,12 +33,16 @@ export function determineJenjangAndKelas(rawKelas: any, rawJenjang?: any): { jen
   const strKelas = String(rawKelas || '').toLowerCase().trim();
   const strJenjang = String(rawJenjang || '').toLowerCase().trim();
 
-  // If explicitly specified as TK, PAUD, or 0 in kelas or jenjang column
+  // If explicitly specified as TK, PAUD, PG/Playgroup, 0, or empty in kelas or jenjang column
   if (
+    strKelas === '' ||
     strKelas.includes('tk') ||
     strJenjang.includes('tk') ||
     strKelas.includes('paud') ||
     strJenjang.includes('paud') ||
+    strKelas.includes('pg') ||
+    strJenjang.includes('pg') ||
+    strKelas.includes('playgroup') ||
     strKelas === '0'
   ) {
     return { jenjang: 'TK', kelas: 0 };
@@ -67,11 +72,47 @@ export function determineJenjangAndKelas(rawKelas: any, rawJenjang?: any): { jen
  * Determine Jenjang from string e.g. "SD", "SMP", "SMA/SMK", "SMA"
  */
 export function determineJenjangGuru(rawJenjang: any): Jenjang {
-  const str = String(rawJenjang || '').toLowerCase().trim();
-  if (str.includes('tk')) return 'TK';
-  if (str.includes('smp')) return 'SMP';
-  if (str.includes('sma') || str.includes('smk')) return 'SMA_SMK';
-  return 'SD';
+  return determineJenjangGuruList(rawJenjang)[0] || 'SD';
+}
+
+/**
+ * Parse multi-jenjang e.g. "SD / SMP / SMA" -> ["SD","SMP","SMA_SMK"]
+ */
+export function determineJenjangGuruList(rawJenjang: any): Jenjang[] {
+  const out: Jenjang[] = [];
+  for (const part of String(rawJenjang || '').split('/')) {
+    const str = part.toLowerCase().trim();
+    if (str.includes('tk')) out.push('TK');
+    else if (str.includes('smp')) out.push('SMP');
+    else if (str.includes('sma') || str.includes('smk')) out.push('SMA_SMK');
+    else if (str.includes('sd')) out.push('SD');
+  }
+  return [...new Set(out)];
+}
+
+/**
+ * Normalize tanggal lahir ke YYYY-MM-DD.
+ * Terima ISO (2015-06-08), Indonesia (8 Juni 2015), slash (08/06/2015).
+ */
+const BULAN_ID = ['januari', 'februari', 'maret', 'april', 'mei', 'juni', 'juli', 'agustus', 'september', 'oktober', 'november', 'desember'];
+
+export function normalizeTanggal(raw: any): string {
+  const s = String(raw || '').trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  m = s.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/);
+  if (m) {
+    const bi = BULAN_ID.indexOf(m[2].toLowerCase());
+    if (bi >= 0) return `${m[3]}-${String(bi + 1).padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  }
+  m = s.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})/);
+  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  return s; // biarkan apa adanya, validasi di form/API
+}
+
+/** Strip non-digit No WA (0812-0000-0001 -> 081200000001). */
+export function normalizeNoWa(raw: any): string {
+  return String(raw || '').replace(/[^0-9]/g, '');
 }
 
 /**
@@ -124,11 +165,12 @@ export async function parseSiswaExcel(file: File): Promise<ParsedSiswaRow[]> {
 
     if (!tempatLahir) tempatLahir = 'Surabaya';
     if (!tanggalLahir) tanggalLahir = '2012-05-15';
+    tanggalLahir = normalizeTanggal(tanggalLahir);
 
-    const noTelpOrtu = getValue('nowaortu', 'no_wa_ortu', 'notelportu', 'nowa', 'nohp', 'telepon');
+    const noTelpOrtu = normalizeNoWa(getValue('nowaortu', 'no_wa_ortu', 'notelportu', 'nowa', 'nohp', 'telepon'));
     const alamat = getValue('alamat', 'alamatrumah', 'alamat_lengkap');
     const namaIbu = getValue('namaibu', 'nama_ibu', 'ibu') || 'Ibu Kandung';
-    const diskonStr = getValue('diskon', 'nominaldiskon', 'potongan');
+    const diskonStr = getValue('diskon', 'diskonnominal', 'nominaldiskon', 'potongan');
     const diskon = parseInt(diskonStr.replace(/[^0-9]/g, ''), 10) || 0;
 
     result.push({
@@ -178,13 +220,15 @@ export async function parseGuruExcel(file: File): Promise<ParsedGuruRow[]> {
     const alamat = getValue('alamat', 'alamatrumah', 'alamat_lengkap');
     const noTelp = getValue('nowa', 'no_wa', 'notelp', 'no_telp', 'nohp', 'telepon');
     const rawJenjang = getValue('jenjang', 'jenjangmengajar', 'jenjang_mengajar');
-    const jenjang = determineJenjangGuru(rawJenjang);
+    const jenjangList = determineJenjangGuruList(rawJenjang);
+    const jenjang = jenjangList[0] || 'SD';
 
     result.push({
       nama,
       alamat: alamat || 'Jl. Pemuda Surabaya',
       noTelp: noTelp || '081234567890',
       jenjang,
+      jenjangList,
     });
   }
 

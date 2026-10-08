@@ -64,11 +64,11 @@ Aplikasi ini dilengkapi **Simulator Cron Job** (Tombol `Cron SPP Tgl 1` di bar h
 
 ---
 
-## 🗄️ Struktur Kode Backend Laravel (`/backend`)
-Untuk keperluan deployment backend Laravel + MySQL:
-1. `backend/database/migrations/`: File migrasi untuk tabel `cabang`, `users`, `guru`, `guru_cabang`, `siswa` (dengan `softDeletes`), `tarif_spp`, `pembayaran_spp` (dengan `unique_spp_siswa_bulan_tahun`), `jadwal`, dan `transaksi`.
-2. `backend/app/Services/SPPBillingService.php`: Logika bisnis pembuat tagihan SPP bulanan dengan `DB::transaction` dan lock.
-3. `backend/app/Http/Controllers/SiswaController.php`: Pengatur penugasan guru dengan pengunci database untuk mencegah race condition penugasan ke-7.
+## 🗄️ Struktur Backend Express (`/backend`)
+API Express + MySQL 8 (pengganti stub Laravel lama):
+1. `backend/schema.sql`: Skema `cabang`, `users` (hash bcrypt + JWT), `guru`, `guru_cabang`, `siswa` (soft delete), `tarif_spp`, `pembayaran_spp` (`UNIQUE(siswa_id,bulan,tahun)`), `transaksi`, `jadwal`.
+2. `backend/index.js`: Satu file API — auth, CRUD cabang/siswa/guru/SPP/transaksi, billing idempoten, validasi kuota 6 via `SELECT ... FOR UPDATE`.
+3. Jalankan: `cd backend && npm install && node index.js` (`:3001`, butuh MySQL `les_db`).
 
 ---
 

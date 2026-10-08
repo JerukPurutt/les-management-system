@@ -59,7 +59,8 @@ export function calculateSPPRate(jenjang: Jenjang, kelas: number): number {
 }
 
 export function isTeacherEligibleForStudent(guru: Guru, siswa: Siswa): boolean {
-  return guru.jenjang === siswa.jenjang;
+  const list = guru.jenjangList && guru.jenjangList.length > 0 ? guru.jenjangList : [guru.jenjang];
+  return list.includes(siswa.jenjang);
 }
 
 export function countTeacherAssignedStudents(guruId: string, allSiswa: Siswa[]): number {
