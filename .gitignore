@@ -1,0 +1,30 @@
+# deps
+node_modules/
+
+# build output (regenerasi via `npm run build`)
+dist/
+
+# env & secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# logs & OS
+npm-debug.log*
+*.log
+.DS_Store
+Thumbs.db
+
+# vite cache
+.vite/
+
+# IDE & editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# TS & test
+*.tsbuildinfo
+coverage/

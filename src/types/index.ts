@@ -37,6 +37,7 @@ export interface Guru {
   tanggalLahir?: string;
   alamat?: string;
   jenjang: Jenjang;
+  jenjangList?: Jenjang[]; // multi-jenjang (ex: ["SD","SMP"]); fallback ke jenjang bila kosong
   cabangIds: string[]; // Many to many
   isActive: boolean;
 }

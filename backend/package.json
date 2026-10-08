@@ -1,0 +1,20 @@
+{
+  "name": "les-api",
+  "private": true,
+  "version": "1.0.0",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "db:init": "mysql -h %DB_HOST% -u %DB_USER% -p%DB_PASS% %DB_NAME% < schema.sql"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.9.7",
+    "swagger-ui-express": "^5.0.1"
+  }
+}

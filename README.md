@@ -73,6 +73,9 @@ npm run preview  # pratinjau hasil build
 
 Base URL: `http://localhost:3001/api` — semua rute (kecuali login & health) butuh header `Authorization: Bearer <token>`.
 
+> Dokumentasi interaktif + uji coba langsung: buka **`http://localhost:3001/api/docs`** (Swagger UI).
+> Alur: `POST /auth/login` → copy `token` → tombol **Authorize** → tempel `Bearer <token>` → Try it out.
+
 | Method | Endpoint               | Akses        | Keterangan                              |
 | ------ | ---------------------- | ------------ | --------------------------------------- |
 | GET    | `/health`              | publik       | Status API + koneksi DB                 |
