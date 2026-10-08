@@ -15,16 +15,7 @@ import {
   Jenjang,
 } from './types';
 import { ParsedSiswaRow, ParsedGuruRow } from './utils/excelHelpers';
-import {
-  INITIAL_CABANG,
-  INITIAL_USERS,
-  INITIAL_GURU,
-  INITIAL_SISWA,
-  INITIAL_TARIF,
-  INITIAL_PEMBAYARAN_SPP,
-  INITIAL_TRANSAKSI,
-  INITIAL_JADWAL,
-} from './data/initialData';
+import { api } from './utils/api';
 import { Header } from './components/common/Header';
 import { Sidebar } from './components/common/Sidebar';
 import { LoginPage } from './components/auth/LoginPage';
@@ -56,10 +47,13 @@ export function App() {
   const [theme, setTheme] = useState<Theme>('light');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
 
-  // User Accounts & Role State
-  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
-  const [currentUser, setCurrentUser] = useState<User>(INITIAL_USERS[1]); // Default Ibu Ratna
-  const [currentRole, setCurrentRole] = useState<Role>(INITIAL_USERS[1].role);
+  // User Accounts & Role State (diisi dari API saat login)
+  const [users, setUsers] = useState<User[]>([]);
+  const [currentUser, setCurrentUser] = useState<User>({
+    id: '', nama: '', email: '', role: 'cabang', isActive: false, createdAt: '',
+  });
+  const [currentRole, setCurrentRole] = useState<Role>('cabang');
+  const [dataReady, setDataReady] = useState<boolean>(false);
 
   // Selection States
   const [selectedCabangId, setSelectedCabangId] = useState<string>('cab-1');
@@ -67,15 +61,15 @@ export function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard-cabang');
   const [isCronModalOpen, setIsCronModalOpen] = useState(false);
 
-  // Core Data Lists
-  const [cabangList, setCabangList] = useState<Cabang[]>(INITIAL_CABANG);
-  const [guruList, setGuruList] = useState<Guru[]>(INITIAL_GURU);
-  const [siswaList, setSiswaList] = useState<Siswa[]>(INITIAL_SISWA);
-  const [tarifList, setTarifList] = useState<TarifSPP[]>(INITIAL_TARIF);
+  // Core Data Lists (diisi dari API saat login)
+  const [cabangList, setCabangList] = useState<Cabang[]>([]);
+  const [guruList, setGuruList] = useState<Guru[]>([]);
+  const [siswaList, setSiswaList] = useState<Siswa[]>([]);
+  const [tarifList, setTarifList] = useState<TarifSPP[]>([]);
   const [biayaPendaftaranBase, setBiayaPendaftaranBase] = useState(100000);
-  const [sppList, setSppList] = useState<PembayaranSPP[]>(INITIAL_PEMBAYARAN_SPP);
-  const [transaksiList, setTransaksiList] = useState<Transaksi[]>(INITIAL_TRANSAKSI);
-  const [jadwalList, setJadwalList] = useState<Jadwal[]>(INITIAL_JADWAL);
+  const [sppList, setSppList] = useState<PembayaranSPP[]>([]);
+  const [transaksiList, setTransaksiList] = useState<Transaksi[]>([]);
+  const [jadwalList, setJadwalList] = useState<Jadwal[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([
     {
       id: 'log-1',
@@ -103,37 +97,88 @@ export function App() {
   const currentCabang = cabangList.find((c) => c.id === selectedCabangId) || cabangList[0];
   const currentGuru = guruList.find((g) => g.id === selectedGuruId) || guruList[0];
 
-  const logAudit = (action: string, details: string) => {
+  const logAudit = (action: string, details: string, u?: User) => {
+    const who = u || currentUser;
+    if (!who.id) return;
     const newLog: AuditLog = {
       id: `log-${Date.now()}`,
       timestamp: new Date().toISOString(),
-      userId: currentUser.id,
-      userNama: `${currentUser.nama}`,
+      userId: who.id,
+      userNama: `${who.nama}`,
       action,
       details,
     };
     setAuditLogs((prev) => [newLog, ...prev]);
   };
 
-  const handleLoginSuccess = (user: User) => {
+  // Muat semua data dari API setelah login
+  const reloadAll = async (user: User) => {
+    const [cabang, guru, siswa, spp, trx, tarif, jadwal] = await Promise.all([
+      api.cabang.list(),
+      api.guru.list(),
+      api.siswa.list(),
+      api.spp.list(),
+      api.transaksi.list(),
+      api.tarif.list(),
+      api.jadwal.list(),
+    ]);
+    setCabangList(cabang);
+    setGuruList(guru);
+    setSiswaList(siswa);
+    setSppList(spp);
+    setTransaksiList(trx);
+    setTarifList(tarif);
+    setJadwalList(jadwal);
+    try {
+      const biaya = await api.setting.get('biaya_pendaftaran');
+      setBiayaPendaftaranBase(Number(biaya.value) || 100000);
+    } catch { /* default lokal */ }
+    if (user.role === 'pusat') {
+      try {
+        setUsers(await api.listUsers());
+      } catch { setUsers([user]); }
+    } else {
+      setUsers([user]);
+    }
+    if (user.cabangId) setSelectedCabangId(user.cabangId);
+    else if (cabang[0]) setSelectedCabangId(cabang[0].id);
+    if (user.teacherId) setSelectedGuruId(user.teacherId);
+    else if (guru[0]) setSelectedGuruId(guru[0].id);
+    setDataReady(true);
+  };
+
+  const refresh = () => reloadAll(currentUser);
+
+  // Bungkus mutasi API: gagal -> alert + batal (tanpa ubah state lokal)
+  const save = async <T,>(fn: () => Promise<T>): Promise<T | null> => {
+    try {
+      return await fn();
+    } catch (e: any) {
+      alert(`Gagal simpan ke server: ${e?.message || e}`);
+      return null;
+    }
+  };
+
+  const handleLoginSuccess = async (user: User) => {
     setCurrentUser(user);
     setCurrentRole(user.role);
     if (user.role === 'pusat') {
       setActiveTab('dashboard-pusat');
     } else if (user.role === 'cabang') {
-      if (user.cabangId) setSelectedCabangId(user.cabangId);
       setActiveTab('dashboard-cabang');
     } else if (user.role === 'guru') {
-      if (user.teacherId) setSelectedGuruId(user.teacherId);
       setActiveTab('jadwal-guru');
     }
+    await reloadAll(user);
     setIsAuthenticated(true);
-    logAudit('LOGIN', `Pengguna ${user.nama} berhasil masuk ke sistem.`);
+    logAudit('LOGIN', `Pengguna ${user.nama} berhasil masuk ke sistem.`, user);
   };
 
   const handleLogout = () => {
     logAudit('LOGOUT', `Pengguna ${currentUser.nama} keluar dari sistem.`);
+    api.logout();
     setIsAuthenticated(false);
+    setDataReady(false);
   };
 
   const handleRoleChange = (role: Role) => {
@@ -144,37 +189,17 @@ export function App() {
   };
 
   // PUSAT HANDLERS
-  const handleAddCabang = (nama: string, alamat: string) => {
-    const newCabId = `cab-${Date.now()}`;
-    const newCab: Cabang = {
-      id: newCabId,
-      nama,
-      alamat,
-      status: 'aktif',
-      createdAt: new Date().toISOString(),
-    };
-
-    const newAccId = `usr-${Date.now()}`;
-    const cleanEmail = `cabang.${nama.toLowerCase().replace(/[^a-z0-9]/g, '')}@lespintar.id`;
-    const newAcc: User = {
-      id: newAccId,
-      nama: `Pimpinan ${nama}`,
-      email: cleanEmail,
-      password: 'cabang123',
-      role: 'cabang',
-      cabangId: newCabId,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-    };
-
-    setCabangList((prev) => [...prev, newCab]);
-    setUsers((prev) => [...prev, newAcc]);
-    logAudit('TAMBAH_CABANG', `Membuat ${nama} & akun leader ${cleanEmail}`);
-
+  const handleAddCabang = async (nama: string, alamat: string) => {
+    const r = await save(() => api.cabang.create(nama, alamat));
+    if (!r) return { newCabang: null as any, newAccount: null as any };
+    await refresh();
+    const newCab: Cabang = { id: r.id, nama, alamat, status: 'aktif', createdAt: new Date().toISOString() };
+    const newAcc = { id: `usr-${Date.now()}`, nama: `Pimpinan ${nama}`, email: r.loginEmail, role: 'cabang' as Role, cabangId: r.id, isActive: true, createdAt: new Date().toISOString() } as User;
+    logAudit('TAMBAH_CABANG', `Membuat ${nama} & akun leader ${r.loginEmail}`);
     return { newCabang: newCab, newAccount: newAcc };
   };
 
-  const handleAddGuruPusat = (
+  const handleAddGuruPusat = async (
     nama: string,
     noTelp: string,
     noPegawai: string,
@@ -185,85 +210,40 @@ export function App() {
     accountRole: 'guru' | 'cabang',
     assignedCabangId?: string
   ) => {
-    const newGuruId = `guru-${Date.now()}`;
-    const newUserId = `usr-${Date.now()}`;
-    const autoEmail = `${noPegawai.toLowerCase().replace(/[^a-z0-9]/g, '')}@lespintar.id`;
-
-    const newUser: User = {
-      id: newUserId,
-      nama,
-      email: autoEmail,
-      noPegawai,
-      tanggalLahir,
-      password: tanggalLahir,
-      role: accountRole,
-      cabangId: accountRole === 'cabang' ? (assignedCabangId || cabangIds[0] || 'cab-1') : null,
-      teacherId: newGuruId,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-    };
-
-    const newGuru: Guru = {
-      id: newGuruId,
-      userId: newUserId,
-      nama,
-      email: autoEmail,
-      noTelp,
-      noPegawai,
-      tanggalLahir,
-      alamat,
-      jenjang,
+    const r = await save(() => api.guru.create({
+      nama, noTelp, noPegawai, tanggalLahir, alamat, jenjang,
       cabangIds: cabangIds.length > 0 ? cabangIds : [selectedCabangId],
-      isActive: true,
-    };
-
-    setUsers((prev) => [...prev, newUser]);
-    setGuruList((prev) => [...prev, newGuru]);
+    }));
+    if (!r) return { newUser: null as any, newGuru: null as any };
+    if (accountRole === 'cabang') {
+      const us = await api.listUsers().catch(() => [] as User[]);
+      const acc = us.find((x) => x.teacherId === r.id);
+      if (acc) await save(() => api.setUserRole(acc.id, 'cabang', assignedCabangId || cabangIds[0] || selectedCabangId));
+    }
+    await refresh();
     logAudit('TAMBAH_GURU_PUSAT', `Pusat menambah guru NIP ${noPegawai} (${nama}) & akun ${accountRole.toUpperCase()}`);
 
-    return { newUser, newGuru };
+    // info modal saja (data asli sudah reload dari server)
+    return {
+      newUser: { id: '', nama, email: r.email, noPegawai, tanggalLahir, role: accountRole, isActive: true, createdAt: '' } as User,
+      newGuru: { id: r.id, userId: '', nama, email: r.email, noTelp, jenjang, cabangIds, isActive: true } as Guru,
+    };
   };
 
-  const handlePromoteGuruRole = (
+  const handlePromoteGuruRole = async (
     guruId: string,
     newRole: 'guru' | 'cabang',
     assignedCabangId?: string
   ) => {
     const targetGuru = guruList.find((g) => g.id === guruId);
     if (!targetGuru) return;
-
-    setUsers((prev) => {
-      const userIndex = prev.findIndex(
-        (u) => u.teacherId === guruId || u.email.toLowerCase() === targetGuru.email.toLowerCase()
-      );
-
-      if (userIndex !== -1) {
-        return prev.map((u, i) =>
-          i === userIndex
-            ? {
-                ...u,
-                role: newRole,
-                cabangId: newRole === 'cabang' ? (assignedCabangId || targetGuru.cabangIds[0] || 'cab-1') : null,
-              }
-            : u
-        );
-      } else {
-        const newAcc: User = {
-          id: `usr-${Date.now()}`,
-          nama: targetGuru.nama,
-          email: targetGuru.email,
-          noPegawai: targetGuru.noPegawai || `NIP-${Math.floor(1000 + Math.random() * 9000)}`,
-          tanggalLahir: targetGuru.tanggalLahir || '1995-01-01',
-          password: targetGuru.tanggalLahir || '1995-01-01',
-          role: newRole,
-          cabangId: newRole === 'cabang' ? (assignedCabangId || targetGuru.cabangIds[0] || 'cab-1') : null,
-          teacherId: guruId,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-        };
-        return [...prev, newAcc];
-      }
-    });
+    const matched = users.find(
+      (u) => u.teacherId === guruId || u.email.toLowerCase() === targetGuru.email.toLowerCase()
+    );
+    if (!matched) return;
+    const ok = await save(() => api.setUserRole(matched.id, newRole, assignedCabangId || targetGuru.cabangIds[0]));
+    if (!ok) return;
+    await refresh();
 
     logAudit(
       'UBAH_PERAN_GURU',
@@ -271,32 +251,39 @@ export function App() {
     );
   };
 
-  const handleUpdateCabang = (
+  const handleUpdateCabang = async (
     id: string,
     nama: string,
     alamat: string,
     status: 'aktif' | 'nonaktif'
   ) => {
-    setCabangList((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, nama, alamat, status } : c))
-    );
+    const ok = await save(() => api.cabang.update(id, { nama, alamat, status }));
+    if (!ok) return;
+    await refresh();
     logAudit('UPDATE_CABANG', `Mengubah data cabang ${nama}`);
   };
 
-  const handleDeleteCabang = (id: string) => {
+  const handleDeleteCabang = async (id: string) => {
     const targetCabang = cabangList.find((c) => c.id === id);
-    setCabangList((prev) => prev.filter((c) => c.id !== id));
+    const ok = await save(() => api.cabang.remove(id));
+    if (!ok) return;
+    await refresh();
     logAudit('HAPUS_CABANG', `Menghapus cabang ${targetCabang?.nama || id}`);
   };
 
-  const handleUpdateTarif = (id: string, nominal: number) => {
-    setTarifList((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, nominal } : t))
-    );
+  const handleUpdateTarif = async (id: string, nominal: number) => {
+    const ok = await save(() => api.tarif.update(id, nominal));
+    if (!ok) return;
+    await refresh();
+  };
+
+  const handleUpdateBiayaPendaftaran = async (v: number) => {
+    await save(() => api.setting.set('biaya_pendaftaran', String(v)));
+    setBiayaPendaftaranBase(v);
   };
 
   // CABANG HANDLERS
-  const handleRegisterStudent = (formData: {
+  const handleRegisterStudent = async (formData: {
     nama: string;
     tempatLahir: string;
     tanggalLahir: string;
@@ -308,298 +295,118 @@ export function App() {
     diskon: number;
     keteranganDiskon: string;
   }) => {
-    const newSiswaId = `sis-${Date.now()}`;
-    const newSiswa: Siswa = {
-      id: newSiswaId,
-      cabangId: currentCabang.id,
-      nama: formData.nama,
-      tempatLahir: formData.tempatLahir,
-      tanggalLahir: formData.tanggalLahir,
-      alamat: formData.alamat,
-      namaIbu: formData.namaIbu,
-      noTelpOrtu: formData.noTelpOrtu,
-      jenjang: formData.jenjang,
-      kelas: formData.kelas,
-      guruId: null,
-      status: 'aktif',
-      createdAt: new Date().toISOString(),
-    };
-
-    setSiswaList((prev) => [newSiswa, ...prev]);
-
-    const netRegistration = Math.max(0, biayaPendaftaranBase - formData.diskon);
-    const newTrx: Transaksi = {
-      id: `trx-${Date.now()}`,
-      cabangId: currentCabang.id,
-      tipe: 'masuk',
-      kategori: 'Pendaftaran',
-      nominal: netRegistration,
-      keterangan: `Pendaftaran Siswa Baru: ${formData.nama} ${
-        formData.diskon > 0 ? `(Diskon Rp${formData.diskon.toLocaleString()})` : ''
-      }`,
-      tanggal: new Date().toISOString().split('T')[0],
-      referensiId: newSiswaId,
-    };
-    setTransaksiList((prev) => [newTrx, ...prev]);
-
-    const sppRate = calculateSPPRate(formData.jenjang, formData.kelas);
-    const newSPP: PembayaranSPP = {
-      id: `spp-${Date.now()}`,
-      siswaId: newSiswaId,
-      cabangId: currentCabang.id,
-      bulan: 9,
-      tahun: 2026,
-      nominal: sppRate,
-      status: 'belum_bayar',
-      createdAt: new Date().toISOString(),
-    };
-    setSppList((prev) => [newSPP, ...prev]);
+    const r = await save(() => api.siswa.create({ ...formData, cabangId: currentCabang.id }));
+    if (!r) return;
+    await refresh();
 
     logAudit('DAFTAR_SISWA', `Mendaftarkan siswa baru ${formData.nama} di ${currentCabang.nama}`);
   };
 
-  const handleBatchRegisterStudents = (students: ParsedSiswaRow[]) => {
-    const newSiswaItems: Siswa[] = [];
-    const newTrxItems: Transaksi[] = [];
-    const newSppItems: PembayaranSPP[] = [];
-    const baseTime = Date.now();
-
-    students.forEach((s, idx) => {
-      const newSiswaId = `sis-${baseTime}-${idx}`;
-      const newSiswa: Siswa = {
-        id: newSiswaId,
-        cabangId: currentCabang.id,
-        nama: s.nama,
-        tempatLahir: s.tempatLahir,
-        tanggalLahir: s.tanggalLahir,
-        alamat: s.alamat,
-        namaIbu: s.namaIbu,
-        noTelpOrtu: s.noTelpOrtu,
-        jenjang: s.jenjang,
-        kelas: s.kelas,
-        guruId: null,
-        status: 'aktif',
-        createdAt: new Date().toISOString(),
-      };
-      newSiswaItems.push(newSiswa);
-
-      const netRegistration = Math.max(0, biayaPendaftaranBase - s.diskon);
-      const newTrx: Transaksi = {
-        id: `trx-${baseTime}-${idx}`,
-        cabangId: currentCabang.id,
-        tipe: 'masuk',
-        kategori: 'Pendaftaran',
-        nominal: netRegistration,
-        keterangan: `Pendaftaran Siswa (Import Excel): ${s.nama} ${
-          s.diskon > 0 ? `(Diskon Rp${s.diskon.toLocaleString()})` : ''
-        }`,
-        tanggal: new Date().toISOString().split('T')[0],
-        referensiId: newSiswaId,
-      };
-      newTrxItems.push(newTrx);
-
-      const sppRate = calculateSPPRate(s.jenjang, s.kelas);
-      const newSPP: PembayaranSPP = {
-        id: `spp-${baseTime}-${idx}`,
-        siswaId: newSiswaId,
-        cabangId: currentCabang.id,
-        bulan: 9,
-        tahun: 2026,
-        nominal: sppRate,
-        status: 'belum_bayar',
-        createdAt: new Date().toISOString(),
-      };
-      newSppItems.push(newSPP);
+  const handleBatchRegisterStudents = async (students: ParsedSiswaRow[]) => {
+    const ok = await save(async () => {
+      for (const s of students) await api.siswa.create({ ...s, cabangId: currentCabang.id });
     });
-
-    setSiswaList((prev) => [...newSiswaItems, ...prev]);
-    setTransaksiList((prev) => [...newTrxItems, ...prev]);
-    setSppList((prev) => [...newSppItems, ...prev]);
+    if (!ok) return;
+    await refresh();
 
     logAudit('IMPORT_EXCEL_SISWA', `Berhasil mengimpor ${students.length} siswa baru via Excel di ${currentCabang.nama}`);
   };
 
-  const handleUpdateSiswaStatus = (siswaId: string, status: StudentStatus) => {
-    setSiswaList((prev) =>
-      prev.map((s) => {
-        if (s.id === siswaId) {
-          const isKeluar = status === 'keluar';
-          return {
-            ...s,
-            status,
-            guruId: isKeluar ? null : s.guruId,
-          };
-        }
-        return s;
-      })
-    );
-
-    if (status === 'keluar') {
-      setJadwalList((prev) => prev.filter((j) => j.siswaId !== siswaId));
-    }
+  const handleUpdateSiswaStatus = async (siswaId: string, status: StudentStatus) => {
+    const ok = await save(() => api.siswa.setStatus(siswaId, status));
+    if (!ok) return;
+    await refresh();
 
     logAudit('UPDATE_STATUS_SISWA', `Mengubah status siswa ID ${siswaId} menjadi ${status}`);
   };
 
-  const handleAssignGuru = (siswaId: string, guruId: string | null) => {
-    if (guruId) {
-      const teacherObj = guruList.find((g) => g.id === guruId);
-      const studentObj = siswaList.find((s) => s.id === siswaId);
-
-      if (teacherObj && studentObj) {
-        if (!isTeacherEligibleForStudent(teacherObj, studentObj)) {
-          return {
-            success: false,
-            message: `Guru ${teacherObj.nama} (${teacherObj.jenjang}) tidak cocok untuk siswa jenjang ${studentObj.jenjang}.`,
-          };
-        }
-
-        const currentCount = countTeacherAssignedStudents(guruId, siswaList);
-
-        if (studentObj.guruId !== guruId && currentCount >= 6) {
-          return {
-            success: false,
-            message: `Penugasan ditolak sistem! Guru ${teacherObj.nama} sudah mengajar 6/6 siswa (Batas Maksimal Kuota).`,
-          };
-        }
-      }
+  const handleAssignGuru = async (siswaId: string, guruId: string | null) => {
+    try {
+      await api.siswa.assign(siswaId, guruId);
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Penugasan gagal' };
     }
-
-    setSiswaList((prev) =>
-      prev.map((s) => (s.id === siswaId ? { ...s, guruId } : s))
-    );
+    await refresh();
 
     logAudit('TUGASKAN_GURU', `Menugaskan guru ${guruId} ke siswa ${siswaId}`);
     return { success: true };
   };
 
-  const handleBatchAssignGuru = (siswaIds: string[], guruId: string | null) => {
-    if (guruId) {
-      const teacherObj = guruList.find((g) => g.id === guruId);
-      if (teacherObj) {
-        const currentCount = countTeacherAssignedStudents(guruId, siswaList);
-        const newAssignees = siswaIds.filter((id) => {
-          const s = siswaList.find((st) => st.id === id);
-          return s && s.guruId !== guruId;
-        });
-
-        if (currentCount + newAssignees.length > 6) {
-          const availableSlots = Math.max(0, 6 - currentCount);
-          return {
-            success: false,
-            message: `Guru ${teacherObj.nama} hanya memiliki sisa ${availableSlots} slot kuota (maksimal 6 siswa).`,
-          };
-        }
-      }
+  const handleBatchAssignGuru = async (siswaIds: string[], guruId: string | null) => {
+    try {
+      for (const id of siswaIds) await api.siswa.assign(id, guruId);
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Penugasan massal gagal' };
     }
-
-    setSiswaList((prev) =>
-      prev.map((s) => (siswaIds.includes(s.id) ? { ...s, guruId } : s))
-    );
+    await refresh();
 
     const teacherName = guruList.find((g) => g.id === guruId)?.nama || 'Kosong';
     logAudit('BATCH_TUGASKAN_GURU', `Menugaskan ${siswaIds.length} siswa sekaligus ke guru ${teacherName}`);
     return { success: true, assignedCount: siswaIds.length };
   };
 
-  const handleAutoAssignStudents = () => {
-    const unassignedStudents = siswaList.filter(
-      (s) => s.cabangId === currentCabang.id && s.status === 'aktif' && !s.deletedAt && !s.guruId
-    );
-
-    if (unassignedStudents.length === 0) {
-      return {
-        assignedCount: 0,
-        message: 'Semua siswa aktif di cabang ini sudah memiliki guru penanggung jawab!',
-      };
+  const handleAutoAssignStudents = async () => {
+    let r;
+    try {
+      r = await api.siswa.autoAssign(currentCabang.id);
+    } catch (e: any) {
+      return { assignedCount: 0, message: e?.message || 'Auto-assign gagal' };
     }
-
-    const availableTeachers = guruList.filter(
-      (g) => g.isActive && g.cabangIds.includes(currentCabang.id)
-    );
-
-    const teacherSlots: Record<string, number> = {};
-    availableTeachers.forEach((g) => {
-      teacherSlots[g.id] = countTeacherAssignedStudents(g.id, siswaList);
-    });
-
-    const updates: Record<string, string> = {};
-    let totalAssigned = 0;
-
-    const jenjangList: Jenjang[] = ['SD', 'SMP', 'SMA_SMK', 'TK'];
-
-    jenjangList.forEach((j) => {
-      const jenjangStudents = unassignedStudents.filter((s) => s.jenjang === j);
-      const jenjangTeachers = availableTeachers.filter((g) => g.jenjang === j);
-
-      if (jenjangStudents.length === 0 || jenjangTeachers.length === 0) return;
-
-      jenjangStudents.forEach((s) => {
-        const eligibleTeacher = jenjangTeachers
-          .filter((g) => teacherSlots[g.id] < 6)
-          .sort((a, b) => teacherSlots[a.id] - teacherSlots[b.id])[0];
-
-        if (eligibleTeacher) {
-          updates[s.id] = eligibleTeacher.id;
-          teacherSlots[eligibleTeacher.id] += 1;
-          totalAssigned += 1;
-        }
-      });
-    });
-
-    if (totalAssigned > 0) {
-      setSiswaList((prev) =>
-        prev.map((s) => (updates[s.id] ? { ...s, guruId: updates[s.id] } : s))
-      );
-      logAudit('AUTO_ASSIGN_SISWA', `Auto-assign berhasil menugaskan ${totalAssigned} siswa ke guru di cabang ${currentCabang.nama}`);
-      return {
-        assignedCount: totalAssigned,
-        message: `Berhasil menugaskan ${totalAssigned} siswa secara otomatis ke guru yang sesuai!`,
-      };
-    }
-
+    await refresh();
+    logAudit('AUTO_ASSIGN_SISWA', `Auto-assign menugaskan ${r.assignedCount} siswa di cabang ${currentCabang.nama}`);
     return {
-      assignedCount: 0,
-      message: 'Tidak ada slot guru yang tersedia atau jenjang guru tidak cocok dengan siswa yang belum ditugaskan.',
+      assignedCount: r.assignedCount,
+      message: r.assignedCount > 0
+        ? `Berhasil menugaskan ${r.assignedCount} siswa secara otomatis!`
+        : 'Tidak ada slot guru yang tersedia atau semua siswa sudah berguru.',
     };
   };
 
-  const handleUpdateSiswa = (updatedSiswa: Siswa) => {
-    setSiswaList((prev) =>
-      prev.map((s) => (s.id === updatedSiswa.id ? updatedSiswa : s))
-    );
+  const handleUpdateSiswa = async (updatedSiswa: Siswa) => {
+    const ok = await save(() => api.siswa.update(updatedSiswa.id, {
+      nama: updatedSiswa.nama,
+      tempatLahir: updatedSiswa.tempatLahir,
+      tanggalLahir: updatedSiswa.tanggalLahir,
+      alamat: updatedSiswa.alamat,
+      namaIbu: updatedSiswa.namaIbu,
+      noTelpOrtu: updatedSiswa.noTelpOrtu,
+      jenjang: updatedSiswa.jenjang,
+      kelas: updatedSiswa.kelas,
+    }));
+    if (!ok) return;
+    await refresh();
     logAudit('UPDATE_SISWA', `Mengubah data siswa ${updatedSiswa.nama}`);
   };
 
-  const handleSoftDeleteSiswa = (siswaId: string) => {
-    setSiswaList((prev) =>
-      prev.map((s) => (s.id === siswaId ? { ...s, deletedAt: new Date().toISOString() } : s))
-    );
-    setJadwalList((prev) => prev.filter((j) => j.siswaId !== siswaId));
+  const handleSoftDeleteSiswa = async (siswaId: string) => {
+    const ok = await save(() => api.siswa.remove(siswaId));
+    if (!ok) return;
+    await refresh();
     logAudit('SOFT_DELETE_SISWA', `Soft delete data siswa ID ${siswaId}`);
   };
 
-  const handleBatchNaikKelas = () => {
-    setSiswaList((prev) =>
-      prev.map((s) => {
-        if (s.status !== 'aktif' || s.deletedAt) return s;
-
+  const handleBatchNaikKelas = async () => {
+    const ok = await save(async () => {
+      for (const s of siswaList) {
+        if (s.status !== 'aktif' || s.deletedAt || s.cabangId !== currentCabang.id) continue;
         if (s.jenjang === 'SD' && s.kelas === 6) {
-          return { ...s, jenjang: 'SMP', kelas: 7 };
+          await api.siswa.update(s.id, { jenjang: 'SMP', kelas: 7 });
         } else if (s.jenjang === 'SMP' && s.kelas === 9) {
-          return { ...s, jenjang: 'SMA_SMK', kelas: 10 };
+          await api.siswa.update(s.id, { jenjang: 'SMA_SMK', kelas: 10 });
         } else if (s.jenjang === 'SMA_SMK' && s.kelas >= 12) {
-          return { ...s, status: 'keluar', kelas: 12 };
+          await api.siswa.setStatus(s.id, 'keluar');
         } else {
-          return { ...s, kelas: s.kelas + 1 };
+          await api.siswa.update(s.id, { kelas: s.kelas + 1 });
         }
-      })
-    );
+      }
+    });
+    if (!ok) return;
+    await refresh();
 
     logAudit('MASS_NAIK_KELAS', `Aksi massal Naik Kelas dilaksanakan di cabang ${currentCabang.nama}`);
   };
 
-  const handleAddGuru = (
+  const handleAddGuru = async (
     nama: string,
     noTelp: string,
     noPegawai: string,
@@ -607,58 +414,24 @@ export function App() {
     alamat: string,
     jenjang: Jenjang
   ) => {
-    const newGuruId = `guru-${Date.now()}`;
-    const newUserId = `usr-${Date.now()}`;
-    const autoEmail = `${noPegawai.toLowerCase().replace(/[^a-z0-9]/g, '')}@lespintar.id`;
-
-    const newUser: User = {
-      id: newUserId,
-      nama,
-      email: autoEmail,
-      noPegawai,
-      tanggalLahir,
-      password: tanggalLahir,
-      role: 'guru', // Pimpinan Cabang can ONLY create Guru Biasa accounts
-      cabangId: null,
-      teacherId: newGuruId,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-    };
-
-    const newGuru: Guru = {
-      id: newGuruId,
-      userId: newUserId,
-      nama,
-      email: autoEmail,
-      noTelp,
-      noPegawai,
-      tanggalLahir,
-      alamat,
-      jenjang,
-      cabangIds: [currentCabang.id],
-      isActive: true,
-    };
-
-    setUsers((prev) => [...prev, newUser]);
-    setGuruList((prev) => [...prev, newGuru]);
-
-    // Auto generate default schedule (Senin - Jumat, Sesi 2: 18:00 - 20:00)
-    const defaultDays: Jadwal['hari'][] = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
-    const defaultJadwals: Jadwal[] = defaultDays.map((hari, idx) => ({
-      id: `jdw-${Date.now()}-${idx}`,
-      guruId: newGuruId,
-      siswaId: '',
-      cabangId: currentCabang.id,
-      hari,
-      jamMulai: '18:00',
-      jamSelesai: '20:00',
+    const r = await save(() => api.guru.create({
+      nama, noTelp, noPegawai, tanggalLahir, alamat,
+      jenjangList: [jenjang], cabangIds: [currentCabang.id],
     }));
-    setJadwalList((prev) => [...prev, ...defaultJadwals]);
+    if (!r) return;
+    // Jadwal default Senin-Jumat 18:00-20:00
+    const defaultDays: Jadwal['hari'][] = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+    await save(async () => {
+      for (const hari of defaultDays) {
+        await api.jadwal.create({ guruId: r.id, siswaId: null, cabangId: currentCabang.id, hari, jamMulai: '18:00', jamSelesai: '20:00' });
+      }
+    });
+    await refresh();
 
     logAudit('TAMBAH_GURU_CABANG', `Pimpinan Cabang ${currentCabang.nama} membuat akun GURU BIASA (NIP ${noPegawai}): ${nama}`);
   };
 
-  const handleUpdateGuru = (
+  const handleUpdateGuru = async (
     guruId: string,
     nama: string,
     noTelp: string,
@@ -666,219 +439,136 @@ export function App() {
     alamat: string,
     jenjang: Jenjang
   ) => {
-    setGuruList((prev) =>
-      prev.map((g) =>
-        g.id === guruId
-          ? { ...g, nama, noTelp, tanggalLahir, alamat, jenjang }
-          : g
-      )
-    );
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.teacherId === guruId
-          ? { ...u, nama, tanggalLahir, password: tanggalLahir }
-          : u
-      )
-    );
+    const ok = await save(() => api.guru.update(guruId, { nama, noTelp, tanggalLahir, alamat, jenjang }));
+    if (!ok) return;
+    await refresh();
     logAudit('UPDATE_GURU', `Mengubah data guru ${nama}`);
   };
 
-  const handleDeleteGuru = (guruId: string) => {
+  const handleDeleteGuru = async (guruId: string) => {
     const targetGuru = guruList.find((g) => g.id === guruId);
-    setGuruList((prev) => prev.filter((g) => g.id !== guruId));
-    setUsers((prev) => prev.filter((u) => u.teacherId !== guruId));
-    setSiswaList((prev) =>
-      prev.map((s) => (s.guruId === guruId ? { ...s, guruId: null } : s))
-    );
-    setJadwalList((prev) => prev.filter((j) => j.guruId !== guruId));
+    const ok = await save(() => api.guru.remove(guruId));
+    if (!ok) return;
+    await refresh();
     logAudit('HAPUS_GURU', `Menghapus akun guru ${targetGuru?.nama || guruId}`);
   };
 
-  const handleBatchAddGuru = (teachers: ParsedGuruRow[]) => {
-    const newUsers: User[] = [];
-    const newGurus: Guru[] = [];
-    const baseTime = Date.now();
-
-    const nipNums = guruList
-      .map((g) => {
-        const m = (g.noPegawai || '').match(/\d+/);
-        return m ? parseInt(m[0], 10) : 0;
-      })
-      .filter((n) => !isNaN(n) && n > 0);
-    let maxNip = nipNums.length > 0 ? Math.max(...nipNums) : 3000;
-
-    teachers.forEach((g, idx) => {
-      maxNip += 1;
-      const noPegawai = `NIP-${maxNip}`;
-      const newGuruId = `guru-${baseTime}-${idx}`;
-      const newUserId = `usr-${baseTime}-${idx}`;
-      const autoEmail = `${noPegawai.toLowerCase().replace(/[^a-z0-9]/g, '')}@lespintar.id`;
-      const tanggalLahir = '1995-05-15';
-
-      const newUser: User = {
-        id: newUserId,
-        nama: g.nama,
-        email: autoEmail,
-        noPegawai,
-        tanggalLahir,
-        password: tanggalLahir,
-        role: 'guru',
-        cabangId: null,
-        teacherId: newGuruId,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-      };
-      newUsers.push(newUser);
-
-      const newGuru: Guru = {
-        id: newGuruId,
-        userId: newUserId,
-        nama: g.nama,
-        email: autoEmail,
-        noTelp: g.noTelp,
-        noPegawai,
-        tanggalLahir,
-        alamat: g.alamat,
-        jenjang: g.jenjang,
-        cabangIds: [currentCabang.id],
-        isActive: true,
-      };
-      newGurus.push(newGuru);
+  const handleBatchAddGuru = async (teachers: ParsedGuruRow[]) => {
+    const ok = await save(async () => {
+      for (const g of teachers) {
+        await api.guru.create({
+          nama: g.nama, noTelp: g.noTelp, alamat: g.alamat,
+          jenjangList: g.jenjangList, cabangIds: [currentCabang.id],
+        });
+      }
     });
-
-    setUsers((prev) => [...prev, ...newUsers]);
-    setGuruList((prev) => [...prev, ...newGurus]);
+    if (!ok) return;
+    await refresh();
 
     logAudit('IMPORT_EXCEL_GURU', `Berhasil mengimpor ${teachers.length} guru baru via Excel di ${currentCabang.nama}`);
   };
 
-  const handleAddOrUpdateJadwal = (jadwalData: Omit<Jadwal, 'id'>, editJadwalId?: string) => {
+  const handleAddOrUpdateJadwal = async (jadwalData: Omit<Jadwal, 'id'>, editJadwalId?: string) => {
     const conflictResult = checkScheduleConflict(jadwalData, jadwalList, editJadwalId);
     if (conflictResult.conflict) {
       return { success: false, message: conflictResult.reason };
     }
 
     if (editJadwalId) {
-      setJadwalList((prev) =>
-        prev.map((j) => (j.id === editJadwalId ? { ...j, ...jadwalData } : j))
-      );
+      const ok = await save(() => api.jadwal.update(editJadwalId, {
+        guruId: jadwalData.guruId,
+        siswaId: jadwalData.siswaId || null,
+        cabangId: jadwalData.cabangId,
+        hari: jadwalData.hari,
+        jamMulai: jadwalData.jamMulai,
+        jamSelesai: jadwalData.jamSelesai,
+      }));
+      if (!ok) return { success: false, message: 'Gagal simpan ke server' };
+      await refresh();
       logAudit('UPDATE_JADWAL', `Jadwal diubah: Hari ${jadwalData.hari} jam ${jadwalData.jamMulai}`);
     } else {
-      const newJadwal: Jadwal = {
-        id: `jdw-${Date.now()}`,
-        ...jadwalData,
-      };
-      setJadwalList((prev) => [...prev, newJadwal]);
+      const ok = await save(() => api.jadwal.create({
+        guruId: jadwalData.guruId,
+        siswaId: jadwalData.siswaId || null,
+        cabangId: jadwalData.cabangId,
+        hari: jadwalData.hari,
+        jamMulai: jadwalData.jamMulai,
+        jamSelesai: jadwalData.jamSelesai,
+      }));
+      if (!ok) return { success: false, message: 'Gagal simpan ke server' };
+      await refresh();
       logAudit('TAMBAH_JADWAL', `Jadwal baru dibuat: Hari ${jadwalData.hari} jam ${jadwalData.jamMulai}`);
     }
     return { success: true };
   };
 
-  const handleDeleteJadwal = (jadwalId: string) => {
-    setJadwalList((prev) => prev.filter((j) => j.id !== jadwalId));
+  const handleDeleteJadwal = async (jadwalId: string) => {
+    const ok = await save(() => api.jadwal.remove(jadwalId));
+    if (!ok) return;
+    await refresh();
   };
 
-  const handlePaySPP = (sppId: string, namaPembayar: string, tanggalBayar: string) => {
+  const handlePaySPP = async (sppId: string, namaPembayar: string, tanggalBayar: string) => {
     const targetSpp = sppList.find((s) => s.id === sppId);
     if (!targetSpp) return;
 
-    const noKwitansi = generateReceiptNumber(currentCabang.id, targetSpp.tahun, targetSpp.bulan, sppList.length + 1);
-    const kwitansiUrl = `https://lespintar.id/kwitansi/token-${Math.random().toString(36).substr(2, 9)}`;
-
-    setSppList((prev) =>
-      prev.map((s) =>
-        s.id === sppId
-          ? {
-              ...s,
-              status: 'lunas',
-              namaPembayar,
-              tanggalBayar,
-              noKwitansi,
-              kwitansiUrl,
-            }
-          : s
-      )
-    );
+    let noKwitansi = '';
+    try {
+      const r = await api.spp.pay(sppId, namaPembayar, tanggalBayar);
+      noKwitansi = r.noKwitansi;
+    } catch (e: any) {
+      alert(`Gagal simpan ke server: ${e?.message || e}`);
+      return;
+    }
+    await refresh();
 
     const targetSiswa = siswaList.find((x) => x.id === targetSpp.siswaId);
-    const newIncomeTrx: Transaksi = {
-      id: `trx-${Date.now()}`,
-      cabangId: currentCabang.id,
-      tipe: 'masuk',
-      kategori: 'SPP',
-      nominal: targetSpp.nominal,
-      keterangan: `Pembayaran SPP Bulan ${targetSpp.bulan}/${targetSpp.tahun}: ${targetSiswa?.nama}`,
-      tanggal: tanggalBayar,
-      referensiId: sppId,
-    };
-    setTransaksiList((prev) => [newIncomeTrx, ...prev]);
-
     logAudit('CATAT_SPP', `Mencatat SPP Lunas untuk ${targetSiswa?.nama} (${noKwitansi})`);
   };
 
-  const handleAddManualTransaksi = (trx: Omit<Transaksi, 'id'>) => {
-    const newTrx: Transaksi = {
-      id: `trx-${Date.now()}`,
-      ...trx,
-    };
-    setTransaksiList((prev) => [newTrx, ...prev]);
+  const handleAddManualTransaksi = async (trx: Omit<Transaksi, 'id'>) => {
+    const ok = await save(() => api.transaksi.create(trx));
+    if (!ok) return;
+    await refresh();
     logAudit('TRANSAKSI_MANUAL', `Mencatat ${trx.tipe} Rp${trx.nominal} (${trx.kategori})`);
   };
 
-  const handleMarkSentWhatsApp = (sppId: string) => {
-    setSppList((prev) =>
-      prev.map((s) => (s.id === sppId ? { ...s, dikirimAt: new Date().toISOString() } : s))
-    );
+  const handleMarkSentWhatsApp = async (sppId: string) => {
+    const ok = await save(() => api.spp.markSent(sppId));
+    if (!ok) return;
+    await refresh();
     logAudit('KIRIM_WA_KWITANSI', `Kwitansi SPP ID ${sppId} dikirim ke WhatsApp orang tua`);
   };
 
-  const handleRunCron = (bulan: number, tahun: number) => {
-    let createdCount = 0;
-    let skippedCount = 0;
-
-    const activeStudents = siswaList.filter((s) => s.status === 'aktif' && !s.deletedAt);
-    const newBills: PembayaranSPP[] = [];
-
-    activeStudents.forEach((siswa) => {
-      const existing = sppList.find(
-        (b) => b.siswaId === siswa.id && b.bulan === bulan && b.tahun === tahun
-      );
-
-      if (existing) {
-        skippedCount++;
-      } else {
-        const rate = calculateSPPRate(siswa.jenjang, siswa.kelas);
-        newBills.push({
-          id: `spp-${Date.now()}-${siswa.id}`,
-          siswaId: siswa.id,
-          cabangId: siswa.cabangId,
-          bulan,
-          tahun,
-          nominal: rate,
-          status: 'belum_bayar',
-          createdAt: new Date().toISOString(),
-        });
-        createdCount++;
-      }
-    });
-
-    if (newBills.length > 0) {
-      setSppList((prev) => [...newBills, ...prev]);
+  const handleRunCron = async (bulan: number, tahun: number) => {
+    let r;
+    try {
+      r = await api.spp.billing(bulan, tahun);
+    } catch (e: any) {
+      return { createdCount: 0, skippedCount: 0 };
     }
+    await refresh();
 
-    logAudit('CRON_JOB_RUN', `Simulasi Cron SPP Tgl 1 (Bulan ${bulan}/${tahun}): ${createdCount} dibuat, ${skippedCount} diwaspadai/diewati`);
-    return { createdCount, skippedCount };
+    logAudit('CRON_JOB_RUN', `Simulasi Cron SPP Tgl 1 (Bulan ${bulan}/${tahun}): ${r.created} dibuat, ${r.skipped} dilewati`);
+    return { createdCount: r.created, skippedCount: r.skipped };
   };
 
   // Render Login Page if not authenticated
   if (!isAuthenticated) {
     return (
       <LoginPage
-        allUsers={users}
         onLoginSuccess={handleLoginSuccess}
         theme={theme}
         setTheme={setTheme}
       />
+    );
+  }
+
+  if (!dataReady || !currentCabang) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-zinc-950 text-slate-500 text-sm">
+        Memuat data dari server...
+      </div>
     );
   }
 
@@ -947,7 +637,7 @@ export function App() {
               tarifList={tarifList}
               biayaPendaftaran={biayaPendaftaranBase}
               onUpdateTarif={handleUpdateTarif}
-              onUpdateBiayaPendaftaran={setBiayaPendaftaranBase}
+              onUpdateBiayaPendaftaran={handleUpdateBiayaPendaftaran}
             />
           )}
           {currentRole === 'pusat' && activeTab === 'audit-log' && (
@@ -984,11 +674,10 @@ export function App() {
               onAutoAssignStudents={handleAutoAssignStudents}
               onUpdateSiswa={handleUpdateSiswa}
               onSoftDeleteSiswa={handleSoftDeleteSiswa}
-              onUpdateSiswaClass={(id, newK) =>
-                setSiswaList((prev) =>
-                  prev.map((s) => (s.id === id ? { ...s, kelas: newK } : s))
-                )
-              }
+              onUpdateSiswaClass={async (id, newK) => {
+                const ok = await save(() => api.siswa.update(id, { kelas: newK }));
+                if (ok) await refresh();
+              }}
               onBatchNaikKelas={handleBatchNaikKelas}
               onBatchRegisterStudents={handleBatchRegisterStudents}
             />

@@ -7,7 +7,7 @@ interface CronSimulatorModalProps {
   siswaList: Siswa[];
   sppList: PembayaranSPP[];
   tarifList: TarifSPP[];
-  onRunCron: (bulan: number, tahun: number) => { createdCount: number; skippedCount: number };
+  onRunCron: (bulan: number, tahun: number) => Promise<{ createdCount: number; skippedCount: number }>;
   onClose: () => void;
 }
 
@@ -22,8 +22,8 @@ export const CronSimulatorModal: React.FC<CronSimulatorModalProps> = ({
   const [selectedTahun, setSelectedTahun] = useState(2026);
   const [lastResult, setLastResult] = useState<{ createdCount: number; skippedCount: number } | null>(null);
 
-  const handleExecute = () => {
-    const res = onRunCron(selectedBulan, selectedTahun);
+  const handleExecute = async () => {
+    const res = await onRunCron(selectedBulan, selectedTahun);
     setLastResult(res);
   };
 

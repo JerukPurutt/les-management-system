@@ -19,7 +19,7 @@ interface GuruPusatListProps {
     cabangIds: string[],
     accountRole: 'guru' | 'cabang',
     assignedCabangId?: string
-  ) => { newUser: User; newGuru: Guru };
+  ) => Promise<{ newUser: User | null; newGuru: Guru | null }>;
   onPromoteGuruRole: (
     guruId: string,
     newRole: 'guru' | 'cabang',
@@ -92,11 +92,11 @@ export const GuruPusatList: React.FC<GuruPusatListProps> = ({
     setIsModalOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!namaInput.trim() || !noTelpInput.trim()) return;
 
-    const res = onAddGuruPusat(
+    const res = await onAddGuruPusat(
       namaInput,
       noTelpInput,
       noPegawaiInput,
@@ -107,6 +107,7 @@ export const GuruPusatList: React.FC<GuruPusatListProps> = ({
       accountRoleInput,
       selectedCabangIds[0]
     );
+    if (!res.newGuru || !res.newUser) return;
 
     setCreatedInfo({
       nama: res.newGuru.nama,

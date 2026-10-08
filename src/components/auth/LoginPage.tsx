@@ -1,70 +1,60 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { User, Theme } from '../../types';
 import { Lock, UserCheck, Eye, EyeOff, ShieldCheck, Building2, LogIn, Sun, Moon, CreditCard } from 'lucide-react';
 import { Badge } from '../common/Badge';
+import { api } from '../../utils/api';
 
 interface LoginPageProps {
-  allUsers: User[];
   onLoginSuccess: (user: User) => void;
   theme: Theme;
   setTheme: (theme: Theme) => void;
 }
 
+interface PublicUser {
+  id: string;
+  nama: string;
+  email: string;
+  role: string;
+}
+
 export const LoginPage: React.FC<LoginPageProps> = ({
-  allUsers,
   onLoginSuccess,
   theme,
   setTheme,
 }) => {
-  const [identifierInput, setIdentifierInput] = useState('NIP-2001');
-  const [passwordInput, setPasswordInput] = useState('1990-04-12');
+  const [identifierInput, setIdentifierInput] = useState('admin@lespintar.id');
+  const [passwordInput, setPasswordInput] = useState('admin123');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [accounts, setAccounts] = useState<PublicUser[]>([]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    api.usersPublic().then(setAccounts).catch(() => setAccounts([]));
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
-
-    const term = identifierInput.trim().toLowerCase();
-    const userMatch = allUsers.find(
-      (u) =>
-        u.email.toLowerCase() === term ||
-        (u.noPegawai && u.noPegawai.toLowerCase() === term)
-    );
-
-    if (!userMatch) {
-      setErrorMsg('Nomor Pegawai (NIP) / Email tidak terdaftar dalam sistem.');
-      return;
+    setLoading(true);
+    try {
+      const { user } = await api.login(identifierInput.trim(), passwordInput);
+      if (!user.isActive) {
+        setErrorMsg('Akun ini sedang dinonaktifkan.');
+        return;
+      }
+      onLoginSuccess(user);
+    } catch (err: any) {
+      setErrorMsg(err?.message === 'Kredensial salah'
+        ? 'Email/NIP atau password salah.'
+        : `Gagal masuk: ${err?.message || 'server tidak terjangkau'}`);
+    } finally {
+      setLoading(false);
     }
-
-    const cleanTgl = userMatch.tanggalLahir ? userMatch.tanggalLahir.replace(/-/g, '') : '';
-    const ddmmyyyy = userMatch.tanggalLahir
-      ? userMatch.tanggalLahir.split('-').reverse().join('')
-      : '';
-
-    const isValidPassword =
-      passwordInput === userMatch.password ||
-      passwordInput === userMatch.tanggalLahir ||
-      passwordInput === cleanTgl ||
-      passwordInput === ddmmyyyy ||
-      passwordInput === `${userMatch.role}123`;
-
-    if (!isValidPassword) {
-      setErrorMsg('Password (Tanggal Lahir) yang Anda masukkan salah.');
-      return;
-    }
-
-    if (!userMatch.isActive) {
-      setErrorMsg('Akun ini sedang dinonaktifkan.');
-      return;
-    }
-
-    onLoginSuccess(userMatch);
   };
 
-  const handleQuickSelect = (u: User) => {
-    setIdentifierInput(u.noPegawai || u.email);
-    setPasswordInput(u.tanggalLahir || u.password || `${u.role}123`);
+  const handleQuickSelect = (u: PublicUser) => {
+    setIdentifierInput(u.email);
     setErrorMsg(null);
   };
 
@@ -93,7 +83,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               Masuk ke Sistem
             </h1>
             <p className="text-xs text-slate-500 dark:text-zinc-400">
-              Gunakan Nomor Pegawai (NIP) & Password Tanggal Lahir
+              Email / NIP + password (tersambung ke server)
             </p>
           </div>
 
@@ -106,14 +96,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             <div>
               <label className="block text-slate-700 dark:text-zinc-300 font-medium mb-1">
-                Nomor Pegawai (NIP) / Email *
+                Email / Nomor Pegawai (NIP) *
               </label>
               <div className="relative">
                 <CreditCard className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                 <input
                   type="text"
                   required
-                  placeholder="mis. NIP-2001 atau cabang.jaksel@lespintar.id"
+                  placeholder="mis. admin@lespintar.id atau NIP-3101"
                   value={identifierInput}
                   onChange={(e) => setIdentifierInput(e.target.value)}
                   className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-indigo-500 font-mono"
@@ -123,14 +113,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
             <div>
               <label className="block text-slate-700 dark:text-zinc-300 font-medium mb-1">
-                Password (Tanggal Lahir YYYY-MM-DD / Password) *
+                Password *
               </label>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
-                  placeholder="mis. 1990-04-12 atau cabang123"
+                  placeholder="password akun"
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
                   className="w-full bg-slate-50 dark:bg-zinc-950 border border-slate-200 dark:border-zinc-800 rounded-xl pl-9 pr-9 py-2 text-xs text-slate-900 dark:text-zinc-100 focus:outline-none focus:border-indigo-500 font-mono"
@@ -147,32 +137,33 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
             <button
               type="submit"
-              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 mt-2"
+              disabled={loading}
+              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-semibold text-xs rounded-xl shadow-lg shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 mt-2"
             >
-              <LogIn className="w-4 h-4" /> Masuk ke Aplikasi
+              <LogIn className="w-4 h-4" /> {loading ? 'Memeriksa...' : 'Masuk ke Aplikasi'}
             </button>
           </form>
         </div>
 
-        {/* Right Side: Quick Demo Accounts Selection */}
+        {/* Right Side: Quick Accounts Selection */}
         <div className="md:col-span-6 space-y-3">
           <div className="px-1">
             <h3 className="text-sm font-bold text-slate-900 dark:text-zinc-100 flex items-center gap-2">
-              Akun Login Per Role (Quick Select NIP)
+              Akun Terdaftar di Server
             </h3>
             <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-              Klik salah satu akun demo untuk auto-fill Nomor Pegawai & Tanggal Lahir:
+              Klik untuk isi email otomatis, lalu masukkan password:
             </p>
           </div>
 
-          <div className="space-y-2">
-            {allUsers.map((u) => (
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {accounts.map((u) => (
               <button
                 key={u.id}
                 type="button"
                 onClick={() => handleQuickSelect(u)}
                 className={`w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between ${
-                  identifierInput.toLowerCase() === (u.noPegawai?.toLowerCase() || u.email.toLowerCase())
+                  identifierInput.toLowerCase() === u.email.toLowerCase()
                     ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-600 shadow-2xs'
                     : 'bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 hover:border-indigo-300 dark:hover:border-zinc-700'
                 }`}
@@ -200,7 +191,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                       {u.nama}
                     </div>
                     <div className="text-[11px] font-mono text-slate-500 dark:text-zinc-400">
-                      No. Pegawai: <span className="font-bold text-indigo-600 dark:text-indigo-400">{u.noPegawai || 'NIP-1001'}</span> • Tgl Lahir: <span className="font-bold text-slate-700 dark:text-zinc-200">{u.tanggalLahir || '1990-01-01'}</span>
+                      {u.email}
                     </div>
                   </div>
                 </div>
@@ -210,6 +201,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                 </Badge>
               </button>
             ))}
+            {accounts.length === 0 && (
+              <p className="text-xs text-slate-500 dark:text-zinc-400 text-center py-4">
+                Server tidak terjangkau. Jalankan backend dulu (`cd backend && node index.js`).
+              </p>
+            )}
           </div>
         </div>
       </div>

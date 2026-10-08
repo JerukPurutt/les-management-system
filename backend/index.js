@@ -97,8 +97,9 @@ app.get('/api/health', async (req, res) => {
 // ---------- auth ----------
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body || {};
-  if (!email || !password) return res.status(400).json({ error: 'Email + password wajib' });
-  const rows = await q('SELECT * FROM users WHERE email=? LIMIT 1', [email.toLowerCase()]);
+  if (!email || !password) return res.status(400).json({ error: 'Email/NIP + password wajib' });
+  const term = String(email).toLowerCase();
+  const rows = await q('SELECT * FROM users WHERE email=? OR LOWER(no_pegawai)=? LIMIT 1', [term, term]);
   const user = rows[0];
   if (!user || !user.is_active) return res.status(401).json({ error: 'Kredensial salah' });
   const ok = await bcrypt.compare(password, user.password_hash);
@@ -156,23 +157,30 @@ app.get('/api/guru', auth, async (req, res) => {
   }
   if (rows.length) {
     const [jj] = await pool.query('SELECT guru_id, jenjang FROM guru_jenjang WHERE guru_id IN (?)', [rows.map((r) => r.id)]);
-    const map = {};
-    for (const r of jj) (map[r.guru_id] = map[r.guru_id] || []).push(r.jenjang);
-    for (const r of rows) r.jenjangList = map[r.id] || [r.jenjang];
+    const jmap = {};
+    for (const r of jj) (jmap[r.guru_id] = jmap[r.guru_id] || []).push(r.jenjang);
+    const [cc] = await pool.query('SELECT guru_id, cabang_id FROM guru_cabang WHERE guru_id IN (?)', [rows.map((r) => r.id)]);
+    const cmap = {};
+    for (const r of cc) (cmap[r.guru_id] = cmap[r.guru_id] || []).push(r.cabang_id);
+    for (const r of rows) {
+      r.jenjangList = jmap[r.id] || [r.jenjang];
+      r.cabangIds = cmap[r.id] || [];
+    }
   }
   res.json(rows);
 });
 app.post('/api/guru', auth, allow('pusat', 'cabang'), async (req, res) => {
-  const { nama, noTelp, noPegawai, tanggalLahir, alamat, jenjang, jenjangList, cabangIds } = req.body || {};
+  let { nama, noTelp, noPegawai, tanggalLahir, alamat, jenjang, jenjangList, cabangIds } = req.body || {};
   const list = parseJenjangList(jenjangList || jenjang);
   if (!nama || !noTelp || !list.length) return res.status(400).json({ error: 'nama + noTelp + jenjang wajib' });
+  if (!noPegawai) noPegawai = `NIP-${Math.floor(100000 + Math.random() * 900000)}`;
   const gid = uid('guru');
   const email = `${(noPegawai || nama).toLowerCase().replace(/[^a-z0-9]/g, '')}@lespintar.id`;
   const hash = await bcrypt.hash(tanggalLahir || '1995-01-01', 10);
   const userId = uid('usr');
   await q(
-    'INSERT INTO users (id,nama,email,password_hash,role,teacher_id,is_active) VALUES (?,?,?,?,\'guru\',?,1)',
-    [userId, nama, email, hash, gid]
+    'INSERT INTO users (id,nama,email,no_pegawai,tanggal_lahir,password_hash,role,teacher_id,is_active) VALUES (?,?,?,?,?,?,\'guru\',?,1)',
+    [userId, nama, email, noPegawai || null, tanggalLahir || null, hash, gid]
   );
   await q(
     'INSERT INTO guru (id,user_id,nama,email,no_telp,no_pegawai,tanggal_lahir,alamat,jenjang) VALUES (?,?,?,?,?,?,?,?,?)',
@@ -311,6 +319,45 @@ app.delete('/api/siswa/:id', auth, allow('pusat', 'cabang'), async (req, res) =>
   await q('UPDATE siswa SET deleted_at=NOW() WHERE id=?', [req.params.id]); // soft delete, transaksi utuh
   res.json({ ok: true });
 });
+app.put('/api/siswa/:id', auth, allow('pusat', 'cabang'), async (req, res) => {
+  const { nama, tempatLahir, tanggalLahir, alamat, namaIbu, noTelpOrtu, jenjang, kelas } = req.body || {};
+  await q(`UPDATE siswa SET nama=COALESCE(?,nama), tempat_lahir=COALESCE(?,tempat_lahir),
+    tanggal_lahir=COALESCE(?,tanggal_lahir), alamat=COALESCE(?,alamat), nama_ibu=COALESCE(?,nama_ibu),
+    no_telp_ortu=COALESCE(?,no_telp_ortu), jenjang=COALESCE(?,jenjang), kelas=COALESCE(?,kelas) WHERE id=?`,
+    [nama || null, tempatLahir || null, tanggalLahir || null, alamat || null, namaIbu || null,
+     noTelpOrtu || null, jenjang || null, kelas ?? null, req.params.id]);
+  res.json({ ok: true });
+});
+// auto-assign: jenjang langka dulu (SMA,SMP,TK,SD), load-balance, kuota 6
+app.post('/api/siswa/auto-assign', auth, allow('pusat', 'cabang'), async (req, res) => {
+  const cabangId = req.body?.cabangId || req.user.cabangId;
+  if (!cabangId) return res.status(400).json({ error: 'cabangId wajib' });
+  const gurus = await q(
+    `SELECT g.id FROM guru g JOIN guru_cabang gc ON gc.guru_id=g.id WHERE gc.cabang_id=? AND g.is_active=1`, [cabangId]);
+  const gj = await q('SELECT guru_id, jenjang FROM guru_jenjang');
+  const canTeach = {};
+  for (const r of gj) (canTeach[r.guru_id] = canTeach[r.guru_id] || []).push(r.jenjang);
+  const cnt = await q(
+    `SELECT guru_id, COUNT(*) n FROM siswa WHERE guru_id IS NOT NULL AND status!='keluar' AND deleted_at IS NULL GROUP BY guru_id`);
+  const slots = {};
+  for (const g of gurus) slots[g.id] = 0;
+  for (const r of cnt) if (slots[r.guru_id] !== undefined) slots[r.guru_id] = Number(r.n);
+  const students = await q(
+    `SELECT id, jenjang FROM siswa WHERE cabang_id=? AND status='aktif' AND deleted_at IS NULL AND guru_id IS NULL ORDER BY id`, [cabangId]);
+  let assigned = 0;
+  const unassigned = [];
+  for (const jenjang of ['SMA_SMK', 'SMP', 'TK', 'SD']) {
+    for (const s of students.filter((x) => x.jenjang === jenjang)) {
+      const cand = gurus.filter((g) => (canTeach[g.id] || []).includes(jenjang) && slots[g.id] < 6)
+        .sort((a, b) => slots[a.id] - slots[b.id])[0];
+      if (!cand) { unassigned.push(s.id); continue; }
+      await q('UPDATE siswa SET guru_id=? WHERE id=?', [cand.id, s.id]);
+      slots[cand.id]++;
+      assigned++;
+    }
+  }
+  res.json({ assignedCount: assigned, unassignedCount: unassigned.length });
+});
 
 // ---------- SPP ----------
 // GET list, POST billing cron idempoten, PATCH pay
@@ -388,6 +435,91 @@ app.post('/api/transaksi', auth, allow('pusat', 'cabang'), async (req, res) => {
   await q('INSERT INTO transaksi (id,cabang_id,tipe,kategori,nominal,keterangan,tanggal) VALUES (?,?,?,?,?,?,?)',
     [id, cabangId, tipe, kategori || 'Lainnya', nominal, keterangan || '', tanggal || new Date().toISOString().slice(0, 10)]);
   res.status(201).json({ id });
+});
+
+// ---------- users (pusat) ----------
+const mapUser = (u) => {
+  if (!u) return u;
+  const { password_hash, ...safe } = u;
+  return {
+    id: safe.id, nama: safe.nama, email: safe.email,
+    noPegawai: safe.no_pegawai || undefined,
+    tanggalLahir: safe.tanggal_lahir ? String(safe.tanggal_lahir).slice(0, 10) : undefined,
+    role: safe.role, cabangId: safe.cabang_id || null, teacherId: safe.teacher_id || null,
+    isActive: !!safe.is_active, createdAt: safe.created_at,
+  };
+};
+app.get('/api/users/public', async (req, res) => {
+  res.json(await q(`SELECT id,nama,email,role FROM users WHERE is_active=1 ORDER BY role,nama`));
+});
+app.get('/api/users', auth, allow('pusat'), async (req, res) => {
+  res.json((await q('SELECT * FROM users ORDER BY created_at DESC')).map(mapUser));
+});
+app.patch('/api/users/:id/role', auth, allow('pusat'), async (req, res) => {
+  const { role, cabangId } = req.body || {};
+  if (!['pusat', 'cabang', 'guru'].includes(role)) return res.status(400).json({ error: 'role invalid' });
+  await q('UPDATE users SET role=?, cabang_id=? WHERE id=?', [role, role === 'cabang' ? (cabangId || null) : null, req.params.id]);
+  res.json({ ok: true });
+});
+
+// ---------- tarif ----------
+app.get('/api/tarif', auth, async (req, res) => {
+  res.json((await q('SELECT * FROM tarif_spp')).map((t) => ({
+    id: t.id, jenjang: t.jenjang, kelasMin: t.kelas_min, kelasMax: t.kelas_max,
+    nominal: Number(t.nominal), berlakuSejak: String(t.berlaku_sejak).slice(0, 10),
+  })));
+});
+app.put('/api/tarif/:id', auth, allow('pusat'), async (req, res) => {
+  const { nominal } = req.body || {};
+  if (nominal === undefined) return res.status(400).json({ error: 'nominal wajib' });
+  await q('UPDATE tarif_spp SET nominal=? WHERE id=?', [nominal, req.params.id]);
+  res.json({ ok: true });
+});
+
+// ---------- jadwal ----------
+const mapJadwal = (j) => ({
+  id: j.id, guruId: j.guru_id, siswaId: j.siswa_id, cabangId: j.cabang_id, hari: j.hari,
+  jamMulai: String(j.jam_mulai).slice(0, 5), jamSelesai: String(j.jam_selesai).slice(0, 5),
+});
+app.get('/api/jadwal', auth, async (req, res) => {
+  const { guruId, cabangId } = req.query;
+  let sql = 'SELECT * FROM jadwal WHERE 1=1';
+  const p = [];
+  if (guruId) { sql += ' AND guru_id=?'; p.push(guruId); }
+  if (cabangId) { sql += ' AND cabang_id=?'; p.push(cabangId); }
+  res.json((await q(sql, p)).map(mapJadwal));
+});
+app.post('/api/jadwal', auth, allow('pusat', 'cabang'), async (req, res) => {
+  const { guruId, siswaId, cabangId, hari, jamMulai, jamSelesai } = req.body || {};
+  if (!guruId || !cabangId || !hari || !jamMulai || !jamSelesai) return res.status(400).json({ error: 'guruId + cabangId + hari + jam wajib' });
+  const id = uid('jdw');
+  await q('INSERT INTO jadwal (id,guru_id,siswa_id,cabang_id,hari,jam_mulai,jam_selesai) VALUES (?,?,?,?,?,?,?)',
+    [id, guruId, siswaId || null, cabangId, hari, jamMulai, jamSelesai]);
+  res.status(201).json({ id });
+});
+app.put('/api/jadwal/:id', auth, allow('pusat', 'cabang'), async (req, res) => {
+  const { guruId, siswaId, cabangId, hari, jamMulai, jamSelesai } = req.body || {};
+  await q(`UPDATE jadwal SET guru_id=COALESCE(?,guru_id), siswa_id=?, cabang_id=COALESCE(?,cabang_id),
+    hari=COALESCE(?,hari), jam_mulai=COALESCE(?,jam_mulai), jam_selesai=COALESCE(?,jam_selesai) WHERE id=?`,
+    [guruId || null, siswaId === undefined ? undefined : (siswaId || null), cabangId || null, hari || null, jamMulai || null, jamSelesai || null, req.params.id]);
+  res.json({ ok: true });
+});
+app.delete('/api/jadwal/:id', auth, allow('pusat', 'cabang'), async (req, res) => {
+  await q('DELETE FROM jadwal WHERE id=?', [req.params.id]);
+  res.json({ ok: true });
+});
+
+// ---------- settings ----------
+app.get('/api/settings/:key', auth, async (req, res) => {
+  const rows = await q('SELECT nilai FROM settings WHERE kunci=?', [req.params.key]);
+  if (!rows[0]) return res.status(404).json({ error: 'Setting tidak ada' });
+  res.json({ key: req.params.key, value: rows[0].nilai });
+});
+app.put('/api/settings/:key', auth, allow('pusat'), async (req, res) => {
+  const { value } = req.body || {};
+  if (value === undefined) return res.status(400).json({ error: 'value wajib' });
+  await q('INSERT INTO settings (kunci,nilai) VALUES (?,?) ON DUPLICATE KEY UPDATE nilai=?', [req.params.key, String(value), String(value)]);
+  res.json({ ok: true });
 });
 
 app.use((req, res) => res.status(404).json({ error: 'Rute tidak ada' }));

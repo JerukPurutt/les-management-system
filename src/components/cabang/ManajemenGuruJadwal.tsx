@@ -23,7 +23,7 @@ interface ManajemenGuruJadwalProps {
   onBatchAddGuru?: (teachers: ParsedGuruRow[]) => void;
   onUpdateGuru?: (guruId: string, nama: string, noTelp: string, tanggalLahir: string, alamat: string, jenjang: Jenjang) => void;
   onDeleteGuru?: (guruId: string) => void;
-  onAddOrUpdateJadwal: (jadwalData: Omit<Jadwal, 'id'>, editJadwalId?: string) => { success: boolean; message?: string };
+  onAddOrUpdateJadwal: (jadwalData: Omit<Jadwal, 'id'>, editJadwalId?: string) => Promise<{ success: boolean; message?: string }>;
   onDeleteJadwal: (jadwalId: string) => void;
 }
 
@@ -208,7 +208,7 @@ export const ManajemenGuruJadwal: React.FC<ManajemenGuruJadwalProps> = ({
     setIsAddJadwalOpen(true);
   };
 
-  const handleAddJadwalSubmit = (e: React.FormEvent) => {
+  const handleAddJadwalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setScheduleError(null);
 
@@ -217,7 +217,7 @@ export const ManajemenGuruJadwal: React.FC<ManajemenGuruJadwalProps> = ({
       return;
     }
 
-    const res = onAddOrUpdateJadwal(
+    const res = await onAddOrUpdateJadwal(
       {
         guruId: selectedGuruId,
         siswaId: '',

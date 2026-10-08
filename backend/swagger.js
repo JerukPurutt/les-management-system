@@ -113,6 +113,12 @@ const spec = {
       },
     },
     '/api/siswa/{id}': {
+      put: {
+        tags: ['Siswa'], summary: 'Edit data siswa',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { nama: { type: 'string' }, kelas: { type: 'integer' }, jenjang: { type: 'string' }, alamat: { type: 'string' } } } } } },
+        responses: { 200: { description: 'OK' } },
+      },
       delete: {
         tags: ['Siswa'], summary: 'Soft delete (riwayat keuangan utuh)',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
@@ -163,6 +169,79 @@ const spec = {
         tags: ['Transaksi'], summary: 'Catat kas manual',
         requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['cabangId', 'tipe', 'nominal'], properties: { cabangId: { type: 'string' }, tipe: { type: 'string', enum: ['masuk', 'keluar'] }, kategori: { type: 'string' }, nominal: { type: 'number' }, keterangan: { type: 'string' }, tanggal: { type: 'string', format: 'date' } } } } } },
         responses: { 201: { description: 'Dibuat' } },
+      },
+    },
+    '/api/users/public': {
+      get: { tags: ['Auth'], security: [], summary: 'Akun aktif (untuk pilihan login)', responses: { 200: { description: 'OK' } } },
+    },
+    '/api/users': {
+      get: { tags: ['Users'], summary: 'Semua user (pusat)', responses: { 200: { description: 'OK' } } },
+    },
+    '/api/users/{id}/role': {
+      patch: {
+        tags: ['Users'], summary: 'Ubah peran (pusat)',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['role'], properties: { role: { type: 'string', enum: ['pusat', 'cabang', 'guru'] }, cabangId: { type: 'string' } } } } } },
+        responses: { 200: { description: 'OK' } },
+      },
+    },
+    '/api/tarif': {
+      get: { tags: ['Tarif'], summary: 'Daftar tarif SPP', responses: { 200: { description: 'OK' } } },
+    },
+    '/api/tarif/{id}': {
+      put: {
+        tags: ['Tarif'], summary: 'Ubah nominal (pusat)',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['nominal'], properties: { nominal: { type: 'number' } } } } } },
+        responses: { 200: { description: 'OK' } },
+      },
+    },
+    '/api/jadwal': {
+      get: {
+        tags: ['Jadwal'], summary: 'Daftar jadwal',
+        parameters: [
+          { name: 'guruId', in: 'query', schema: { type: 'string' } },
+          { name: 'cabangId', in: 'query', schema: { type: 'string' } },
+        ],
+        responses: { 200: { description: 'OK' } },
+      },
+      post: {
+        tags: ['Jadwal'], summary: 'Tambah jadwal',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['guruId', 'cabangId', 'hari', 'jamMulai', 'jamSelesai'], properties: { guruId: { type: 'string' }, siswaId: { type: 'string' }, cabangId: { type: 'string' }, hari: { type: 'string' }, jamMulai: { type: 'string' }, jamSelesai: { type: 'string' } } } } } },
+        responses: { 201: { description: 'Dibuat' } },
+      },
+    },
+    '/api/jadwal/{id}': {
+      put: {
+        tags: ['Jadwal'], summary: 'Edit jadwal',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { hari: { type: 'string' }, jamMulai: { type: 'string' }, jamSelesai: { type: 'string' } } } } } },
+        responses: { 200: { description: 'OK' } },
+      },
+      delete: {
+        tags: ['Jadwal'], summary: 'Hapus jadwal',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'OK' } },
+      },
+    },
+    '/api/siswa/auto-assign': {
+      post: {
+        tags: ['Siswa'], summary: 'Auto-assign load-balance kuota 6',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['cabangId'], properties: { cabangId: { type: 'string' } } } } } },
+        responses: { 200: { description: '{assignedCount, unassignedCount}' } },
+      },
+    },
+    '/api/settings/{key}': {
+      get: {
+        tags: ['Util'], summary: 'Baca setting',
+        parameters: [{ name: 'key', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'OK' } },
+      },
+      put: {
+        tags: ['Util'], summary: 'Tulis setting (pusat)',
+        parameters: [{ name: 'key', in: 'path', required: true, schema: { type: 'string' } }],
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['value'], properties: { value: { type: 'string' } } } } } },
+        responses: { 200: { description: 'OK' } },
       },
     },
   },
