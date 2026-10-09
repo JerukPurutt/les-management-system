@@ -19,33 +19,42 @@ export const StatCard: React.FC<StatCardProps> = ({
   trend,
 }) => {
   const iconVariants = {
-    default: 'bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 border-slate-200 dark:border-zinc-700',
-    danger: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20',
+    default: 'bg-zinc-100 dark:bg-white/5 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-white/10',
+    danger: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
     success: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
     warning: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
     indigo: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
   };
 
   return (
-    <div className="rounded-xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 p-3.5 sm:p-4 shadow-2xs hover:border-slate-300 dark:hover:border-zinc-700 transition-colors">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-slate-500 dark:text-zinc-400">{title}</span>
-        <div className={`p-1.5 rounded-lg border ${iconVariants[variant]}`}>
-          <Icon className="w-4 h-4" />
-        </div>
-      </div>
-
-      <div className="mt-2">
-        <div className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-zinc-100 font-sans">
-          {value}
-        </div>
-        {subtitle && <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">{subtitle}</p>}
-        {trend && (
-          <div className="mt-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-            <span>↑ {trend}</span>
+    <div className="p-1 rounded-2xl bg-zinc-200/50 dark:bg-white/[0.03] border border-zinc-200/80 dark:border-white/10 shadow-xs hover:border-zinc-300 dark:hover:border-white/20 transition-all duration-300">
+      <div className="h-full bg-white dark:bg-[#09090b] border border-zinc-100 dark:border-white/5 rounded-[calc(1rem-0.25rem)] p-4 sm:p-5 flex flex-col justify-between space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-mono uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-medium">
+            {title}
+          </span>
+          <div className={`p-2 rounded-xl border ${iconVariants[variant]} shadow-2xs`}>
+            <Icon className="w-4 h-4" />
           </div>
-        )}
+        </div>
+
+        <div>
+          <div className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white font-mono">
+            {value}
+          </div>
+          {subtitle && (
+            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-normal font-normal">
+              {subtitle}
+            </p>
+          )}
+          {trend && (
+            <div className="mt-2 text-[10px] font-mono font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+              <span>↑ {trend}</span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 };
+
