@@ -55,19 +55,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
-      className={`bg-white dark:bg-zinc-950 border-r border-slate-200 dark:border-zinc-800/80 transition-all duration-300 shrink-0 ${
-        isCollapsed ? 'w-14 sm:w-16 p-2' : 'w-56 p-3'
+      className={`bg-white/80 dark:bg-[#050505]/95 backdrop-blur-xl border-r border-zinc-200/80 dark:border-white/10 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] shrink-0 z-30 ${
+        isCollapsed ? 'w-16 p-2' : 'w-60 p-3 sm:p-4'
       }`}
     >
       {!isCollapsed && (
-        <div className="mb-3 px-2">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500 font-mono">
-            Menu ({currentRole})
+        <div className="mb-4 px-3 pt-1">
+          <p className="text-[9px] font-mono font-bold uppercase tracking-[0.25em] text-zinc-400 dark:text-zinc-500 flex items-center gap-1.5">
+            <span className="w-1 h-1 rounded-full bg-indigo-500" /> Navigation
           </p>
         </div>
       )}
 
-      <nav className="space-y-1">
+      <nav className="space-y-1.5">
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -76,16 +76,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
               key={item.id}
               onClick={() => setActiveTab(item.id)}
               title={isCollapsed ? item.label : undefined}
-              className={`w-full flex items-center gap-2.5 rounded-lg text-xs font-medium transition-all ${
-                isCollapsed ? 'justify-center p-2.5' : 'px-2.5 py-2'
+              className={`w-full flex items-center gap-3 rounded-2xl text-xs font-semibold transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.98] ${
+                isCollapsed ? 'justify-center p-3' : 'px-3.5 py-2.5'
               } ${
                 isActive
-                  ? 'bg-indigo-50 dark:bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 shadow-2xs'
-                  : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-900'
+                  ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 shadow-md shadow-zinc-900/10 dark:shadow-white/10'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5'
               }`}
             >
-              <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-zinc-400'}`} />
-              {!isCollapsed && <span className="truncate">{item.label}</span>}
+              <div
+                className={`p-1 rounded-lg transition-transform duration-300 ${
+                  isActive
+                    ? 'scale-105'
+                    : 'opacity-70 group-hover:opacity-100'
+                }`}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+              </div>
+
+              {!isCollapsed && (
+                <span className="truncate tracking-tight flex-1 text-left">{item.label}</span>
+              )}
+
+              {!isCollapsed && isActive && (
+                <span className="w-1.5 h-1.5 rounded-full bg-white dark:bg-zinc-900 shrink-0" />
+              )}
             </button>
           );
         })}
@@ -93,3 +108,4 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </aside>
   );
 };
+
