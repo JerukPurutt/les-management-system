@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS users (
   id VARCHAR(36) PRIMARY KEY,
   nama VARCHAR(150) NOT NULL,
   email VARCHAR(190) NOT NULL UNIQUE,
+  no_pegawai VARCHAR(50) NULL,
+  tanggal_lahir DATE NULL,
   password_hash VARCHAR(255) NOT NULL,
   role ENUM('pusat','cabang','guru') NOT NULL,
   cabang_id VARCHAR(36) NULL,
@@ -138,3 +140,10 @@ INSERT IGNORE INTO tarif_spp (id, jenjang, kelas_min, kelas_max, nominal, berlak
 ('trf-sd2', 'SD', 4, 6, 175000, '2026-01-01'),
 ('trf-smp', 'SMP', 7, 9, 200000, '2026-01-01'),
 ('trf-sma', 'SMA_SMK', 10, 12, 225000, '2026-01-01');
+
+CREATE TABLE IF NOT EXISTS settings (
+  kunci VARCHAR(60) PRIMARY KEY,
+  nilai VARCHAR(255) NOT NULL
+) ENGINE=InnoDB;
+
+INSERT IGNORE INTO settings (kunci, nilai) VALUES ('biaya_pendaftaran', '100000');

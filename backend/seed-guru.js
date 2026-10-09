@@ -59,8 +59,8 @@ function parseJenjang(raw) {
         const userId = uid('usr');
         const hash = await bcrypt.hash('1995-05-15', 10);
         await conn.query(
-          `INSERT INTO users (id,nama,email,password_hash,role,teacher_id,is_active) VALUES (?,?,?,?,'guru',?,1)`,
-          [userId, nama, email, hash, gid]
+          `INSERT INTO users (id,nama,email,no_pegawai,tanggal_lahir,password_hash,role,teacher_id,is_active) VALUES (?,?,?,?,?,?,'guru',?,1)`,
+          [userId, nama, email, nip, '1995-05-15', hash, gid]
         );
         await conn.query(
           `INSERT INTO guru (id,user_id,nama,email,no_telp,no_pegawai,tanggal_lahir,jenjang) VALUES (?,?,?,?,?,?,?,?)`,

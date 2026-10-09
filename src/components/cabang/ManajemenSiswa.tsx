@@ -42,9 +42,9 @@ interface ManajemenSiswaProps {
   guruList: Guru[];
   sppList: PembayaranSPP[];
   onUpdateSiswaStatus: (siswaId: string, status: StudentStatus) => void;
-  onAssignGuru: (siswaId: string, guruId: string | null) => { success: boolean; message?: string };
-  onBatchAssignGuru?: (siswaIds: string[], guruId: string | null) => { success: boolean; message?: string; assignedCount?: number };
-  onAutoAssignStudents?: () => { assignedCount: number; message: string };
+  onAssignGuru: (siswaId: string, guruId: string | null) => Promise<{ success: boolean; message?: string }>;
+  onBatchAssignGuru?: (siswaIds: string[], guruId: string | null) => Promise<{ success: boolean; message?: string; assignedCount?: number }>;
+  onAutoAssignStudents?: () => Promise<{ assignedCount: number; message: string }>;
   onUpdateSiswa?: (updatedSiswa: Siswa) => void;
   onSoftDeleteSiswa: (siswaId: string) => void;
   onUpdateSiswaClass?: (siswaId: string, newKelas: number) => void;
@@ -133,12 +133,12 @@ export const ManajemenSiswa: React.FC<ManajemenSiswaProps> = ({
     }
   };
 
-  const handleExecuteBatchAssign = () => {
+  const handleExecuteBatchAssign = async () => {
     if (selectedSiswaIds.length === 0 || !onBatchAssignGuru) return;
     setBatchActionBanner(null);
 
     const targetGuruId = batchGuruSelected === '' ? null : batchGuruSelected;
-    const res = onBatchAssignGuru(selectedSiswaIds, targetGuruId);
+    const res = await onBatchAssignGuru(selectedSiswaIds, targetGuruId);
 
     if (!res.success) {
       setBatchActionBanner({ type: 'error', message: res.message || 'Gagal menugaskan massal.' });
@@ -152,10 +152,10 @@ export const ManajemenSiswa: React.FC<ManajemenSiswaProps> = ({
     }
   };
 
-  const handleRunAutoAssign = () => {
+  const handleRunAutoAssign = async () => {
     if (!onAutoAssignStudents) return;
     setBatchActionBanner(null);
-    const res = onAutoAssignStudents();
+    const res = await onAutoAssignStudents();
     setBatchActionBanner({
       type: res.assignedCount > 0 ? 'success' : 'error',
       message: res.message,
@@ -199,13 +199,13 @@ export const ManajemenSiswa: React.FC<ManajemenSiswaProps> = ({
     return true;
   });
 
-  const handleAssignSubmit = (e: React.FormEvent) => {
+  const handleAssignSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!assignModalSiswa) return;
     setAssignErrorMessage(null);
 
     const targetGuruId = assignGuruSelected === '' ? null : assignGuruSelected;
-    const res = onAssignGuru(assignModalSiswa.id, targetGuruId);
+    const res = await onAssignGuru(assignModalSiswa.id, targetGuruId);
 
     if (!res.success) {
       setAssignErrorMessage(res.message || 'Penugasan guru gagal.');
@@ -382,10 +382,10 @@ export const ManajemenSiswa: React.FC<ManajemenSiswaProps> = ({
             </button>
 
             <button
-              onClick={() => {
+              onClick={async () => {
                 setBatchGuruSelected('');
                 if (onBatchAssignGuru) {
-                  onBatchAssignGuru(selectedSiswaIds, null);
+                  await onBatchAssignGuru(selectedSiswaIds, null);
                   setSelectedSiswaIds([]);
                   setBatchActionBanner({ type: 'success', message: `Berhasil mengosongkan penugasan ${selectedSiswaIds.length} siswa.` });
                 }

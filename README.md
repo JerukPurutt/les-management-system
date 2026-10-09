@@ -59,13 +59,14 @@ Akun seed:
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173
+npm run dev      # http://localhost:5173 (wajib: backend menyala dulu)
 npm run build    # output produksi ke dist/
 npm run preview  # pratinjau hasil build
 ```
 
-> Mode demo memakai data `src/data/initialData.ts` di memori (hilang saat refresh).
-> Untuk data persisten multi-user, jalankan backend lalu hubungkan via API (lihat tabel di bawah).
+> Frontend tersambung ke API via `src/utils/api.ts` (base URL default `http://localhost:3001`,
+> override dengan `VITE_API_URL`). Login memakai JWT yang disimpan di `localStorage`.
+> Setiap aksi simpan langsung ke MySQL lalu refresh dari server.
 
 ---
 

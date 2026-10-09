@@ -5,7 +5,7 @@ import { Badge } from '../common/Badge';
 
 interface CabangManagementProps {
   cabangList: Cabang[];
-  onAddCabang: (nama: string, alamat: string) => { newCabang: Cabang; newAccount: User };
+  onAddCabang: (nama: string, alamat: string) => Promise<{ newCabang: Cabang | null; newAccount: User | null }>;
   onUpdateCabang: (id: string, nama: string, alamat: string, status: 'aktif' | 'nonaktif') => void;
   onDeleteCabang: (id: string) => void;
 }
@@ -30,14 +30,15 @@ export const CabangManagement: React.FC<CabangManagementProps> = ({
   // Delete Confirm Modal State
   const [deleteConfirmCabang, setDeleteConfirmCabang] = useState<Cabang | null>(null);
 
-  const handleSubmitAdd = (e: React.FormEvent) => {
+  const handleSubmitAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!namaInput.trim() || !alamatInput.trim()) return;
 
-    const res = onAddCabang(namaInput, alamatInput);
+    const res = await onAddCabang(namaInput, alamatInput);
+    if (!res.newAccount) return;
     setCreatedAccountInfo({
       email: res.newAccount.email,
-      pass: 'pimpinan123#',
+      pass: 'cabang123',
     });
     setNamaInput('');
     setAlamatInput('');
