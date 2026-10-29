@@ -125,7 +125,11 @@ export interface AuditLog {
   details: string;
 }
 
+export type TipeAbsensi = 'datang' | 'pulang';
+
 export interface Absensi {
+  noPegawai?: string;
+  cabangNama?: string;
   id: string;
   userId: string;
   cabangId: string;

@@ -79,16 +79,39 @@ const mapTrx = (t: any): Transaksi => ({
 
 export const api = {
   absensi: {
-    async createQr(): Promise<{ token: string; expiresInMs: number }> {
-      return req('/api/absensi/qr', { method: 'POST' });
+    async getStatus(cabangId?: string): Promise<{ datang: boolean; pulang: boolean }> {
+      const qs = cabangId ? `?cabangId=${cabangId}` : '';
+      return req(`/api/absensi/status${qs}`);
     },
-    async scan(token: string): Promise<{ ok: boolean; status: string }> {
+    async setStatus(data: { tipe?: 'datang' | 'pulang'; isOpen: boolean }): Promise<{ ok: boolean; status: { datang: boolean; pulang: boolean } }> {
+      return req('/api/absensi/status', { method: 'POST', body: JSON.stringify(data) });
+    },
+    async createQr(tipe: 'datang' | 'pulang' = 'datang'): Promise<{ token: string; tipe: 'datang' | 'pulang'; expiresInMs: number }> {
+      return req('/api/absensi/qr', { method: 'POST', body: JSON.stringify({ tipe }) });
+    },
+    async scan(token: string): Promise<{ ok: boolean; status: 'datang' | 'pulang'; tipe: 'datang' | 'pulang'; nama: string }> {
       return req('/api/absensi/scan', { method: 'POST', body: JSON.stringify({ token }) });
     },
     async listHariIni(): Promise<Absensi[]> {
       return (await req<any[]>('/api/absensi/hari-ini')).map((a: any): Absensi => ({
         id: a.id, userId: a.userId ?? a.user_id, cabangId: a.cabangId ?? a.cabang_id,
-        nama: a.nama, tanggal: d10(a.tanggal),
+        nama: a.nama, noPegawai: a.noPegawai ?? a.no_pegawai, cabangNama: a.cabangNama ?? a.cabang_nama,
+        tanggal: d10(a.tanggal),
+        jamDatang: a.jamDatang ?? a.jam_datang ?? null,
+        jamPulang: a.jamPulang ?? a.jam_pulang ?? null,
+      }));
+    },
+    async listRiwayat(params?: { startDate?: string; endDate?: string; cabangId?: string; guruId?: string }): Promise<Absensi[]> {
+      const qs = new URLSearchParams();
+      if (params?.startDate) qs.set('startDate', params.startDate);
+      if (params?.endDate) qs.set('endDate', params.endDate);
+      if (params?.cabangId) qs.set('cabangId', params.cabangId);
+      if (params?.guruId) qs.set('guruId', params.guruId);
+      const q = qs.toString();
+      return (await req<any[]>(`/api/absensi/riwayat${q ? `?${q}` : ''}`)).map((a: any): Absensi => ({
+        id: a.id, userId: a.userId ?? a.user_id, cabangId: a.cabangId ?? a.cabang_id,
+        nama: a.nama, noPegawai: a.noPegawai ?? a.no_pegawai, cabangNama: a.cabangNama ?? a.cabang_nama,
+        tanggal: d10(a.tanggal),
         jamDatang: a.jamDatang ?? a.jam_datang ?? null,
         jamPulang: a.jamPulang ?? a.jam_pulang ?? null,
       }));

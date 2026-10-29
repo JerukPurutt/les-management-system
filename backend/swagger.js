@@ -244,6 +244,13 @@ const spec = {
         responses: { 200: { description: 'OK' } },
       },
     },
+    '/api/absensi/status': {
+      get: { tags: ['Absensi'], summary: 'Cek status sesi buka/tutup absensi', responses: { 200: { description: '{datang, pulang}' } } },
+      post: { tags: ['Absensi'], summary: 'Buka atau tutup sesi absensi cabang', responses: { 200: { description: 'OK' } } },
+    },
+    '/api/absensi/riwayat': {
+      get: { tags: ['Absensi'], summary: 'Log dan riwayat absensi guru (datang dan pulang)', responses: { 200: { description: 'OK' } } },
+    },
     '/api/absensi/qr': {
       post: {
         tags: ['Absensi'], summary: 'Buat kode QR absensi (pimpinan cabang). Layar regenerasi tiap 5 detik.',

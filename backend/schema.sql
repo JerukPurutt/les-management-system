@@ -166,7 +166,9 @@ CREATE TABLE IF NOT EXISTS absensi (
 CREATE TABLE IF NOT EXISTS qr_token (
   token VARCHAR(20) PRIMARY KEY,
   cabang_id VARCHAR(36) NOT NULL,
+  tipe ENUM('datang','pulang') NOT NULL DEFAULT 'datang',
   expires_at DATETIME NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_qr_cabang FOREIGN KEY (cabang_id) REFERENCES cabang(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
