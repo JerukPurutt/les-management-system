@@ -25,11 +25,13 @@ import { GuruPusatList } from './components/pusat/GuruPusatList';
 import { PengaturanTarif } from './components/pusat/PengaturanTarif';
 import { AuditLogView } from './components/pusat/AuditLogView';
 import { DashboardCabang } from './components/cabang/DashboardCabang';
+import { AbsensiQr } from './components/cabang/AbsensiQr';
 import { PendaftaranSiswa } from './components/cabang/PendaftaranSiswa';
 import { ManajemenSiswa } from './components/cabang/ManajemenSiswa';
 import { ManajemenGuruJadwal } from './components/cabang/ManajemenGuruJadwal';
 import { KeuanganModule } from './components/cabang/KeuanganModule';
 import { JadwalGuruView } from './components/guru/JadwalGuruView';
+import { ScanAbsensi } from './components/guru/ScanAbsensi';
 import { CronSimulatorModal } from './components/cron/CronSimulatorModal';
 import {
   countTeacherAssignedStudents,
@@ -46,6 +48,7 @@ export function App() {
   // Theme & Collapse State
   const [theme, setTheme] = useState<Theme>('light');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState<boolean>(false);
 
   // User Accounts & Role State (diisi dari API saat login)
   const [users, setUsers] = useState<User[]>([]);
@@ -183,6 +186,7 @@ export function App() {
 
   const handleRoleChange = (role: Role) => {
     setCurrentRole(role);
+    setIsMobileNavOpen(false);
     if (role === 'pusat') setActiveTab('dashboard-pusat');
     else if (role === 'cabang') setActiveTab('dashboard-cabang');
     else setActiveTab('jadwal-guru');
@@ -566,14 +570,14 @@ export function App() {
 
   if (!dataReady || !currentCabang) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-zinc-950 text-slate-500 text-sm">
+      <div className="min-h-screen flex items-center justify-center bg-[#F4F3EE] dark:bg-[#08090A] text-slate-500 text-sm">
         Memuat data dari server...
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-zinc-950 text-slate-900 dark:text-zinc-100 font-sans flex flex-col transition-colors">
+    <div className="min-h-screen bg-[#F4F3EE] dark:bg-[#08090A] text-zinc-900 dark:text-zinc-100 font-sans flex flex-col transition-colors">
       {/* Header Toolbar */}
       <Header
         currentRole={currentRole}
@@ -585,6 +589,8 @@ export function App() {
         setTheme={setTheme}
         isSidebarCollapsed={isSidebarCollapsed}
         setIsSidebarCollapsed={setIsSidebarCollapsed}
+        isMobileNavOpen={isMobileNavOpen}
+        onToggleMobileNav={() => setIsMobileNavOpen((prev) => !prev)}
         selectedCabangId={selectedCabangId}
         setSelectedCabangId={setSelectedCabangId}
         cabangList={cabangList}
@@ -602,6 +608,8 @@ export function App() {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           isCollapsed={isSidebarCollapsed}
+          isMobileOpen={isMobileNavOpen}
+          onCloseMobile={() => setIsMobileNavOpen(false)}
         />
 
         {/* Main Content Area */}
@@ -653,6 +661,9 @@ export function App() {
               sppList={sppList}
               transaksiList={transaksiList}
             />
+          )}
+          {currentRole === 'cabang' && activeTab === 'absensi-qr' && (
+            <AbsensiQr currentCabang={currentCabang} />
           )}
           {currentRole === 'cabang' && activeTab === 'pendaftaran-siswa' && (
             <PendaftaranSiswa
@@ -711,7 +722,10 @@ export function App() {
           )}
 
           {/* GURU VIEW */}
-          {currentRole === 'guru' && (
+          {currentRole === 'guru' && activeTab === 'scan-absensi' && (
+            <ScanAbsensi currentGuru={currentGuru} />
+          )}
+          {currentRole === 'guru' && activeTab !== 'scan-absensi' && (
             <JadwalGuruView
               currentGuru={currentGuru}
               cabangList={cabangList}

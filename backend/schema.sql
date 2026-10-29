@@ -132,7 +132,9 @@ INSERT IGNORE INTO cabang (id, nama, alamat, status) VALUES
 
 INSERT IGNORE INTO users (id, nama, email, password_hash, role, cabang_id, is_active) VALUES
 -- hash bcrypt untuk 'admin123'
-('usr-admin', 'Admin Pusat', 'admin@lespintar.id', '$2a$10$5m1Pl.GMOKz2qDKzE3dZgOtQJmXOvXhV6JUO3nvrZUyx143uK4xt.', 'pusat', NULL, 1);
+('usr-admin', 'Admin Pusat', 'admin@lespintar.id', '$2a$10$5m1Pl.GMOKz2qDKzE3dZgOtQJmXOvXhV6JUO3nvrZUyx143uK4xt.', 'pusat', NULL, 1),
+-- hash bcrypt untuk 'cabang123'
+('usr-cab-jaksel', 'Pimpinan Cabang Jakarta Selatan', 'cabang.jaksel@lespintar.id', '$2a$10$8u1r7aM7F73tIeMvhYxYDeGkY.4N2B43Xk9x.z09mEvC3fQW4lKTC', 'cabang', 'cab-1', 1);
 
 INSERT IGNORE INTO tarif_spp (id, jenjang, kelas_min, kelas_max, nominal, berlaku_sejak) VALUES
 ('trf-tk', 'TK', 0, 0, 150000, '2026-01-01'),
@@ -144,6 +146,28 @@ INSERT IGNORE INTO tarif_spp (id, jenjang, kelas_min, kelas_max, nominal, berlak
 CREATE TABLE IF NOT EXISTS settings (
   kunci VARCHAR(60) PRIMARY KEY,
   nilai VARCHAR(255) NOT NULL
+) ENGINE=InnoDB;
+
+-- Absensi guru via QR: 1 baris per guru per hari (datang & pulang)
+CREATE TABLE IF NOT EXISTS absensi (
+  id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(36) NOT NULL,
+  cabang_id VARCHAR(36) NOT NULL,
+  tanggal DATE NOT NULL,
+  jam_datang DATETIME NULL,
+  jam_pulang DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_absensi_user_tgl (user_id, tanggal),
+  CONSTRAINT fk_absensi_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_absensi_cabang FOREIGN KEY (cabang_id) REFERENCES cabang(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- Token QR berumur pendek; token baru menghapus token lama cabang yang sama
+CREATE TABLE IF NOT EXISTS qr_token (
+  token VARCHAR(20) PRIMARY KEY,
+  cabang_id VARCHAR(36) NOT NULL,
+  expires_at DATETIME NOT NULL,
+  CONSTRAINT fk_qr_cabang FOREIGN KEY (cabang_id) REFERENCES cabang(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 INSERT IGNORE INTO settings (kunci, nilai) VALUES ('biaya_pendaftaran', '100000');

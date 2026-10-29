@@ -16,7 +16,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ logs }) => {
             <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse" /> Security & System Audit
           </div>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-3">
-            <History className="w-6 h-6 text-indigo-500" /> Audit Log & Keamanan Akses
+            <History className="w-6 h-6 text-sky-500" /> Audit Log & Keamanan Akses
           </h2>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
             Catatan riwayat aktivitas penting sistem (Perubahan status SPP, soft delete, penugasan guru, login)
@@ -40,7 +40,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ logs }) => {
 
         <div className="p-1 rounded-2xl bg-zinc-200/50 dark:bg-white/[0.03] border border-zinc-200/80 dark:border-white/10 shadow-xs">
           <div className="bg-white dark:bg-[#09090b] border border-zinc-100 dark:border-white/5 rounded-[calc(1rem-0.25rem)] p-4 flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+            <div className="p-2.5 rounded-xl bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
               <ShieldCheck className="w-4 h-4" />
             </div>
             <div>
@@ -103,7 +103,7 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ logs }) => {
                       </td>
                       <td className="p-4 font-bold text-zinc-900 dark:text-white text-xs whitespace-nowrap">{log.userNama}</td>
                       <td className="p-4 whitespace-nowrap">
-                        <span className="font-mono font-bold text-[11px] px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                        <span className="font-mono font-bold text-[11px] px-2 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
                           {log.action}
                         </span>
                       </td>

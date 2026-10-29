@@ -54,6 +54,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
   const handleQuickSelect = (u: PublicUser) => {
     setIdentifierInput(u.email);
+    if (u.role === 'cabang') {
+      setPasswordInput('cabang123');
+    } else if (u.role === 'guru') {
+      setPasswordInput('1995-05-15');
+    } else {
+      setPasswordInput('admin123');
+    }
     setErrorMsg(null);
   };
 
@@ -343,22 +350,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({
 
               {/* Password Hint */}
               <div
-                className={`p-3 rounded-xl sm:rounded-2xl border flex items-center justify-between text-[11px] font-mono ${
+                className={`p-3 rounded-xl sm:rounded-2xl border flex flex-col gap-1.5 text-[10px] font-mono ${
                   isDark
                     ? 'bg-white/[0.03] border-white/5 text-zinc-400'
                     : 'bg-slate-50 border-slate-200 text-slate-600'
                 }`}
               >
-                <span>Password Guru Default:</span>
-                <span
-                  className={`font-semibold px-2 py-0.5 rounded-lg ${
-                    isDark
-                      ? 'text-white bg-white/10 border border-white/10'
-                      : 'text-zinc-900 bg-white border border-slate-200'
-                  }`}
-                >
-                  1995-05-15
-                </span>
+                <div className="flex items-center justify-between">
+                  <span>Pusat:</span>
+                  <span className={`font-semibold px-1.5 py-0.5 rounded ${isDark ? 'text-white bg-white/10' : 'text-zinc-900 bg-white border border-slate-200'}`}>admin123</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Cabang:</span>
+                  <span className={`font-semibold px-1.5 py-0.5 rounded ${isDark ? 'text-white bg-white/10' : 'text-zinc-900 bg-white border border-slate-200'}`}>cabang123</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Guru:</span>
+                  <span className={`font-semibold px-1.5 py-0.5 rounded ${isDark ? 'text-white bg-white/10' : 'text-zinc-900 bg-white border border-slate-200'}`}>1995-05-15</span>
+                </div>
               </div>
 
             </div>

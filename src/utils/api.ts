@@ -1,4 +1,4 @@
-import type { Cabang, Guru, Jadwal, PembayaranSPP, Siswa, TarifSPP, Transaksi, User } from '../types';
+import type { Absensi, Cabang, Guru, Jadwal, PembayaranSPP, Siswa, TarifSPP, Transaksi, User } from '../types';
 
 const BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 const TOKEN_KEY = 'les_token';
@@ -78,6 +78,23 @@ const mapTrx = (t: any): Transaksi => ({
 });
 
 export const api = {
+  absensi: {
+    async createQr(): Promise<{ token: string; expiresInMs: number }> {
+      return req('/api/absensi/qr', { method: 'POST' });
+    },
+    async scan(token: string): Promise<{ ok: boolean; status: string }> {
+      return req('/api/absensi/scan', { method: 'POST', body: JSON.stringify({ token }) });
+    },
+    async listHariIni(): Promise<Absensi[]> {
+      return (await req<any[]>('/api/absensi/hari-ini')).map((a: any): Absensi => ({
+        id: a.id, userId: a.userId ?? a.user_id, cabangId: a.cabangId ?? a.cabang_id,
+        nama: a.nama, tanggal: d10(a.tanggal),
+        jamDatang: a.jamDatang ?? a.jam_datang ?? null,
+        jamPulang: a.jamPulang ?? a.jam_pulang ?? null,
+      }));
+    },
+  },
+
   async login(identifier: string, password: string): Promise<{ token: string; user: User }> {
     const r = await req<{ token: string; user: any }>('/api/auth/login', {
       method: 'POST', body: JSON.stringify({ email: identifier, password }),
