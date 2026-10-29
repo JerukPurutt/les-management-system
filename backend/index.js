@@ -23,6 +23,16 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
 });
+// auto-migrate qr_token table for tipe
+(async () => {
+  try {
+    await pool.query("ALTER TABLE qr_token ADD COLUMN tipe ENUM('datang','pulang') NOT NULL DEFAULT 'datang'");
+  } catch {}
+  try {
+    await pool.query("ALTER TABLE qr_token ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP");
+  } catch {}
+})();
+
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-ganti-di-prod';
 const uid = (p) => `${p}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
@@ -526,18 +536,71 @@ app.put('/api/settings/:key', auth, allow('pusat'), async (req, res) => {
 // kode QR berumur pendek: layar pimpinan cabang regenerasi tiap 5 detik, grace 5 detik
 const kodeQR = () => randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase();
 const mapAbsensi = (a) => ({
-  id: a.id, userId: a.user_id, cabangId: a.cabang_id, nama: a.nama,
+  id: a.id,
+  userId: a.user_id,
+  cabangId: a.cabang_id,
+  cabangNama: a.cabang_nama || undefined,
+  nama: a.nama,
+  noPegawai: a.no_pegawai || undefined,
   tanggal: a.tanggal_str || (a.tanggal ? new Date(a.tanggal).toISOString().slice(0, 10) : null),
-  jamDatang: a.jam_datang, jamPulang: a.jam_pulang,
+  jamDatang: a.jam_datang,
+  jamPulang: a.jam_pulang,
+});
+
+// Helper check status buka/tutup absensi per cabang & tipe
+async function isAbsensiOpen(cabangId, tipe) {
+  const [row] = await q('SELECT nilai FROM settings WHERE kunci=? LIMIT 1', [`absensi_status_${cabangId}_${tipe}`]);
+  return !row || row.nilai !== '0';
+}
+
+// Cek status sesi buka/tutup
+app.get('/api/absensi/status', auth, async (req, res) => {
+  const cabangId = req.query.cabangId || req.user.cabangId;
+  if (!cabangId) return res.status(400).json({ error: 'cabangId tidak ditemukan' });
+  const datang = await isAbsensiOpen(cabangId, 'datang');
+  const pulang = await isAbsensiOpen(cabangId, 'pulang');
+  res.json({ datang, pulang });
+});
+
+// Buka/tutup sesi absensi cabang
+app.post('/api/absensi/status', auth, allow('cabang'), async (req, res) => {
+  const cabangId = req.user.cabangId;
+  if (!cabangId) return res.status(400).json({ error: 'Akun cabang tidak terhubung ke cabang mana pun' });
+  const { tipe, isOpen } = req.body || {};
+  const val = isOpen ? '1' : '0';
+  if (tipe === 'datang' || tipe === 'pulang') {
+    await q('INSERT INTO settings (kunci,nilai) VALUES (?,?) ON DUPLICATE KEY UPDATE nilai=?',
+      [`absensi_status_${cabangId}_${tipe}`, val, val]);
+    if (!isOpen) {
+      await q('DELETE FROM qr_token WHERE cabang_id=? AND tipe=?', [cabangId, tipe]);
+    }
+  } else {
+    await q('INSERT INTO settings (kunci,nilai) VALUES (?,?) ON DUPLICATE KEY UPDATE nilai=?',
+      [`absensi_status_${cabangId}_datang`, val, val]);
+    await q('INSERT INTO settings (kunci,nilai) VALUES (?,?) ON DUPLICATE KEY UPDATE nilai=?',
+      [`absensi_status_${cabangId}_pulang`, val, val]);
+    if (!isOpen) {
+      await q('DELETE FROM qr_token WHERE cabang_id=?', [cabangId]);
+    }
+  }
+  const datang = await isAbsensiOpen(cabangId, 'datang');
+  const pulang = await isAbsensiOpen(cabangId, 'pulang');
+  res.json({ ok: true, status: { datang, pulang } });
 });
 
 app.post('/api/absensi/qr', auth, allow('cabang'), async (req, res) => {
   const cabangId = req.user.cabangId;
   if (!cabangId) return res.status(400).json({ error: 'Akun cabang tidak terhubung ke cabang mana pun' });
+  const tipe = req.body?.tipe === 'pulang' ? 'pulang' : 'datang';
+  const open = await isAbsensiOpen(cabangId, tipe);
+  if (!open) {
+    return res.status(400).json({ error: `Sesi absensi ${tipe} sedang ditutup oleh cabang` });
+  }
   const token = kodeQR();
-  await q('DELETE FROM qr_token WHERE cabang_id=?', [cabangId]);
-  await q('INSERT INTO qr_token (token,cabang_id,expires_at) VALUES (?,?,DATE_ADD(NOW(), INTERVAL 10 SECOND))', [token, cabangId]);
-  res.json({ token, expiresInMs: 10000 });
+  await q('DELETE FROM qr_token WHERE cabang_id=? AND tipe=?', [cabangId, tipe]);
+  await q('INSERT INTO qr_token (token,cabang_id,tipe,expires_at) VALUES (?,?,?,DATE_ADD(NOW(), INTERVAL 10 SECOND))',
+    [token, cabangId, tipe]);
+  res.json({ token, tipe, expiresInMs: 10000 });
 });
 
 app.post('/api/absensi/scan', auth, async (req, res) => {
@@ -545,31 +608,49 @@ app.post('/api/absensi/scan', auth, async (req, res) => {
   if (!token) return res.status(400).json({ error: 'Kode/scan QR wajib' });
   const [tk] = await q('SELECT * FROM qr_token WHERE token=? AND expires_at > NOW() LIMIT 1', [token]);
   if (!tk) return res.status(400).json({ error: 'QR kadaluarsa atau salah, scan kode terbaru' });
+  const tipe = tk.tipe || 'datang';
+  const open = await isAbsensiOpen(tk.cabang_id, tipe);
+  if (!open) return res.status(400).json({ error: `Sesi absensi ${tipe} sedang ditutup oleh cabang` });
   const [guru] = await q('SELECT * FROM guru WHERE user_id=? LIMIT 1', [req.user.id]);
   if (!guru) return res.status(403).json({ error: 'Hanya akun guru yang bisa absen' });
   const member = await q('SELECT 1 FROM guru_cabang WHERE guru_id=? AND cabang_id=? LIMIT 1', [guru.id, tk.cabang_id]);
   if (!member[0]) return res.status(403).json({ error: 'Kode QR bukan untuk cabang Anda' });
+
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
     const [[row]] = await conn.query('SELECT * FROM absensi WHERE user_id=? AND tanggal=CURDATE() FOR UPDATE', [req.user.id]);
-    let status;
-    if (!row) {
-      await conn.query('INSERT INTO absensi (id,user_id,cabang_id,tanggal,jam_datang) VALUES (?,?,?,CURDATE(),NOW())',
-        [uid('abs'), req.user.id, tk.cabang_id]);
-      status = 'datang';
-    } else if (!row.jam_pulang) {
+
+    if (tipe === 'datang') {
+      if (row && row.jam_datang) {
+        await conn.rollback();
+        const jamStr = new Date(row.jam_datang).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        return res.status(400).json({ error: `Anda sudah absen datang hari ini (pukul ${jamStr})` });
+      }
+      if (!row) {
+        await conn.query('INSERT INTO absensi (id,user_id,cabang_id,tanggal,jam_datang) VALUES (?,?,?,CURDATE(),NOW())',
+          [uid('abs'), req.user.id, tk.cabang_id]);
+      } else {
+        await conn.query('UPDATE absensi SET jam_datang=NOW() WHERE id=?', [row.id]);
+      }
+    } else if (tipe === 'pulang') {
+      if (!row || !row.jam_datang) {
+        await conn.rollback();
+        return res.status(400).json({ error: 'Anda belum absen datang hari ini, tidak bisa absen pulang' });
+      }
+      if (row.jam_pulang) {
+        await conn.rollback();
+        const jamStr = new Date(row.jam_pulang).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        return res.status(400).json({ error: `Anda sudah absen pulang hari ini (pukul ${jamStr})` });
+      }
       await conn.query('UPDATE absensi SET jam_pulang=NOW() WHERE id=?', [row.id]);
-      status = 'pulang';
-    } else {
-      status = 'sudah_lengkap';
     }
+
     await conn.commit();
-    res.json({ ok: true, status, nama: guru.nama });
+    res.json({ ok: true, status: tipe, tipe, nama: guru.nama });
   } catch (e) {
     await conn.rollback();
-    // race antar scan bersamaan: baris pertama sudah tercatat datang
-    if (e.code === 'ER_DUP_ENTRY') return res.json({ ok: true, status: 'datang', nama: guru.nama });
+    if (e.code === 'ER_DUP_ENTRY') return res.status(400).json({ error: 'Absensi sudah tercatat' });
     res.status(500).json({ error: e.message });
   } finally {
     conn.release();
@@ -580,11 +661,59 @@ app.get('/api/absensi/hari-ini', auth, allow('cabang'), async (req, res) => {
   const cabangId = req.user.cabangId;
   if (!cabangId) return res.status(400).json({ error: 'Akun cabang tidak terhubung ke cabang mana pun' });
   const rows = await q(
-    `SELECT a.*, u.nama, DATE_FORMAT(a.tanggal,'%Y-%m-%d') AS tanggal_str FROM absensi a JOIN users u ON u.id=a.user_id
+    `SELECT a.*, u.nama, g.no_pegawai, c.nama AS cabang_nama, DATE_FORMAT(a.tanggal,'%Y-%m-%d') AS tanggal_str
+     FROM absensi a
+     JOIN users u ON u.id=a.user_id
+     LEFT JOIN guru g ON g.user_id=u.id
+     LEFT JOIN cabang c ON c.id=a.cabang_id
      WHERE a.cabang_id=? AND a.tanggal=CURDATE() ORDER BY a.jam_datang DESC`, [cabangId]);
   res.json(rows.map(mapAbsensi));
 });
 
+app.get('/api/absensi/riwayat', auth, async (req, res) => {
+  const { startDate, endDate } = req.query || {};
+  let cabangId = req.query.cabangId;
+  let guruId = req.query.guruId;
+
+  if (req.user.role === 'cabang') {
+    cabangId = req.user.cabangId;
+  } else if (req.user.role === 'guru') {
+    const [g] = await q('SELECT id FROM guru WHERE user_id=? LIMIT 1', [req.user.id]);
+    if (!g) return res.json([]);
+    guruId = g.id;
+  }
+
+  const params = [];
+  let sql = `SELECT a.*, u.nama, g.no_pegawai, c.nama AS cabang_nama,
+                    DATE_FORMAT(a.tanggal, '%Y-%m-%d') AS tanggal_str
+             FROM absensi a
+             JOIN users u ON u.id = a.user_id
+             LEFT JOIN guru g ON g.user_id = u.id
+             LEFT JOIN cabang c ON c.id = a.cabang_id
+             WHERE 1=1`;
+
+  if (cabangId) {
+    sql += ' AND a.cabang_id = ?';
+    params.push(cabangId);
+  }
+  if (guruId) {
+    sql += ' AND g.id = ?';
+    params.push(guruId);
+  }
+  if (startDate) {
+    sql += ' AND a.tanggal >= ?';
+    params.push(startDate);
+  }
+  if (endDate) {
+    sql += ' AND a.tanggal <= ?';
+    params.push(endDate);
+  }
+
+  sql += ' ORDER BY a.tanggal DESC, a.jam_datang DESC LIMIT 300';
+
+  const rows = await q(sql, params);
+  res.json(rows.map(mapAbsensi));
+});
 app.use((req, res) => res.status(404).json({ error: 'Rute tidak ada' }));
 
 const PORT = Number(process.env.PORT || 3001);
