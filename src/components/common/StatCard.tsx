@@ -19,42 +19,39 @@ export const StatCard: React.FC<StatCardProps> = ({
   trend,
 }) => {
   const iconVariants = {
-    default: 'bg-zinc-100 dark:bg-white/5 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-white/10',
-    danger: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
-    success: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-    warning: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
-    indigo: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
+    default: 'border-black/[0.07] bg-black/[0.02] text-zinc-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-400',
+    danger: 'border-rose-500/15 bg-rose-500/[0.06] text-rose-600 dark:text-rose-400',
+    success: 'border-emerald-500/15 bg-emerald-500/[0.06] text-emerald-600 dark:text-emerald-400',
+    warning: 'border-amber-500/15 bg-amber-500/[0.06] text-amber-600 dark:text-amber-400',
+    indigo: 'border-sky-500/15 bg-sky-500/[0.06] text-sky-600 dark:text-sky-400',
   };
 
   return (
-    <div className="p-1 rounded-2xl bg-zinc-200/50 dark:bg-white/[0.03] border border-zinc-200/80 dark:border-white/10 shadow-xs hover:border-zinc-300 dark:hover:border-white/20 transition-all duration-300">
-      <div className="h-full bg-white dark:bg-[#09090b] border border-zinc-100 dark:border-white/5 rounded-[calc(1rem-0.25rem)] p-4 sm:p-5 flex flex-col justify-between space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-mono uppercase tracking-widest text-zinc-500 dark:text-zinc-400 font-medium">
-            {title}
-          </span>
-          <div className={`p-2 rounded-xl border ${iconVariants[variant]} shadow-2xs`}>
-            <Icon className="w-4 h-4" />
-          </div>
-        </div>
+    <div className="group relative h-full overflow-hidden rounded-[1.75rem] border border-black/[0.07] bg-white/90 p-5 transition-[transform,border-color] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-0.5 hover:border-black/[0.12] dark:border-white/[0.08] dark:bg-white/[0.035] dark:hover:border-white/[0.16] sm:p-6">
+      <div className="flex items-start justify-between gap-4">
+        <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+          {title}
+        </span>
+        <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border ${iconVariants[variant]}`}>
+          <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
+        </span>
+      </div>
 
-        <div>
-          <div className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white font-mono">
-            {value}
-          </div>
-          {subtitle && (
-            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1 leading-normal font-normal">
-              {subtitle}
-            </p>
-          )}
-          {trend && (
-            <div className="mt-2 text-[10px] font-mono font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-              <span>↑ {trend}</span>
-            </div>
-          )}
+      <div className="mt-6">
+        <div className="font-mono text-3xl font-semibold tracking-[-0.05em] tabular-nums text-zinc-950 dark:text-white sm:text-4xl">
+          {value}
         </div>
+        {subtitle && (
+          <p className="mt-2 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+            {subtitle}
+          </p>
+        )}
+        {trend && (
+          <div className="mt-3 text-[10px] font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+            ↑ {trend}
+          </div>
+        )}
       </div>
     </div>
   );
 };
-

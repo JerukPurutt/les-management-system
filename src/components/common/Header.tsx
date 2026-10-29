@@ -9,6 +9,8 @@ import {
   ChevronDown,
   LogOut,
   Check,
+  Menu,
+  X,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -21,6 +23,8 @@ interface HeaderProps {
   setTheme: (theme: Theme) => void;
   isSidebarCollapsed: boolean;
   setIsSidebarCollapsed: (collapsed: boolean | ((prev: boolean) => boolean)) => void;
+  isMobileNavOpen: boolean;
+  onToggleMobileNav: () => void;
   selectedCabangId: string;
   setSelectedCabangId: (id: string) => void;
   cabangList: Cabang[];
@@ -41,6 +45,8 @@ export const Header: React.FC<HeaderProps> = ({
   setTheme,
   isSidebarCollapsed,
   setIsSidebarCollapsed,
+  isMobileNavOpen,
+  onToggleMobileNav,
   selectedCabangId,
   setSelectedCabangId,
   cabangList,
@@ -70,147 +76,185 @@ export const Header: React.FC<HeaderProps> = ({
   const isDark = theme === 'dark';
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-zinc-200/80 dark:border-white/10 bg-white/85 dark:bg-[#050505]/90 backdrop-blur-xl px-4 sm:px-6 py-2.5 transition-all duration-300">
-      <div className="flex items-center justify-between gap-3 max-w-7xl mx-auto">
-        {/* Left Brand & Sidebar Toggle */}
-        <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-40 w-full px-3 pb-2 pt-3 sm:px-5">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 rounded-[1.5rem] border border-black/[0.07] bg-[#F4F3EE]/85 px-2.5 py-2 shadow-[0_8px_30px_-18px_rgba(0,0,0,0.18)] backdrop-blur-xl transition-colors duration-300 dark:border-white/[0.08] dark:bg-[#08090A]/85 sm:gap-3 sm:px-3.5">
+        {/* Brand & sidebar / menu controls */}
+        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2.5">
           <button
-            onClick={() => setIsSidebarCollapsed((prev) => !prev)}
-            className="p-2 rounded-xl text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors active:scale-95"
-            title="Buka / Tutup Sidebar"
+            onClick={onToggleMobileNav}
+            aria-label={isMobileNavOpen ? 'Tutup menu' : 'Buka menu'}
+            aria-expanded={isMobileNavOpen}
+            className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-full text-zinc-600 transition-colors hover:bg-black/[0.04] hover:text-zinc-900 active:scale-95 dark:text-zinc-300 dark:hover:bg-white/[0.06] dark:hover:text-white lg:hidden"
           >
-            {isSidebarCollapsed ? (
-              <PanelLeft className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-500" />
+            {isMobileNavOpen ? (
+              <X className="h-4 w-4" strokeWidth={1.75} />
             ) : (
-              <PanelLeftClose className="w-4 h-4 sm:w-5 sm:h-5 text-zinc-500 dark:text-zinc-400" />
+              <Menu className="h-4 w-4" strokeWidth={1.75} />
             )}
           </button>
 
-          <div className="flex items-center gap-3">
-            <div className="p-1 rounded-xl bg-white dark:bg-white/5 border border-zinc-200 dark:border-white/10 shrink-0">
+          <button
+            onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+            aria-label="Buka / tutup sidebar"
+            title="Buka / Tutup Sidebar"
+            className="hidden h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-full text-zinc-500 transition-colors hover:bg-black/[0.04] hover:text-zinc-900 active:scale-95 dark:text-zinc-400 dark:hover:bg-white/[0.06] dark:hover:text-white lg:grid"
+          >
+            {isSidebarCollapsed ? (
+              <PanelLeft className="h-4 w-4 text-sky-600 dark:text-sky-400" strokeWidth={1.75} />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" strokeWidth={1.75} />
+            )}
+          </button>
+
+          <div className="flex min-w-0 items-center gap-2.5">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-black/[0.06] bg-white p-1 dark:border-white/10 dark:bg-white/[0.06]">
               <img
                 src="/logo.png"
                 alt="LKP Sang Siroju Lillah"
-                className="h-7 sm:h-8 object-contain"
+                className="h-7 w-auto object-contain"
               />
             </div>
-            <div className="hidden sm:block">
-              <div className="font-bold text-xs tracking-tight text-zinc-900 dark:text-white leading-tight">
+            <div className="hidden min-w-0 sm:block">
+              <div className="truncate text-xs font-semibold leading-tight tracking-tight text-zinc-900 dark:text-white">
                 LKP Sang Siroju Lillah
               </div>
-              <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Enterprise Management</div>
+              <div className="truncate font-mono text-[9px] uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">
+                Enterprise Management
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Right Toolbar Controls */}
-        <div className="flex items-center gap-2">
-          {/* Cron Trigger Button */}
+        {/* Right toolbar */}
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          {/* Cron trigger */}
           <button
             onClick={onOpenCronModal}
-            className="hidden xs:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-mono font-medium uppercase tracking-wider bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30 hover:bg-amber-500/20 transition-all active:scale-95"
             title="Simulasikan Cron Job Otomatis Tagihan SPP (Tgl 1)"
+            aria-label="Simulasikan cron SPP tanggal 1"
+            className="group flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-amber-500/25 bg-amber-500/[0.08] px-2.5 text-amber-700 transition-colors hover:bg-amber-500/[0.14] active:scale-95 dark:text-amber-300 sm:px-3"
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
-            <span className="hidden sm:inline">Cron SPP Tgl 1</span>
+            <Sparkles
+              className="h-3.5 w-3.5 text-amber-500 transition-transform duration-300 group-hover:scale-110 motion-reduce:transition-none"
+              strokeWidth={1.75}
+            />
+            <span className="hidden font-mono text-[10px] font-medium uppercase tracking-[0.12em] md:inline">
+              Cron SPP
+            </span>
           </button>
 
-          {/* Theme Switcher Button */}
+          {/* Theme switcher */}
           <button
             onClick={toggleTheme}
-            className="p-2 rounded-full border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-white/10 transition-all active:scale-95"
             title={isDark ? 'Mode Terang' : 'Mode Gelap'}
+            aria-label={isDark ? 'Aktifkan mode terang' : 'Aktifkan mode gelap'}
+            className="grid h-9 w-9 cursor-pointer place-items-center rounded-full border border-black/[0.07] bg-white/60 text-zinc-700 transition-colors hover:bg-white active:scale-95 dark:border-white/10 dark:bg-white/[0.05] dark:text-zinc-200 dark:hover:bg-white/[0.09]"
           >
             {isDark ? (
-              <Sun className="w-4 h-4 text-amber-300" />
+              <Sun className="h-4 w-4 text-amber-300" strokeWidth={1.75} />
             ) : (
-              <Moon className="w-4 h-4 text-indigo-600" />
+              <Moon className="h-4 w-4 text-sky-600" strokeWidth={1.75} />
             )}
           </button>
 
-          {/* User Account Switcher */}
+          {/* Account switcher */}
           <div className="relative">
             <button
-              onClick={() => setIsAccountMenuOpen(!isAccountMenuOpen)}
-              className="flex items-center gap-2.5 px-3 py-1.5 rounded-full border border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-white/5 hover:bg-zinc-100 dark:hover:bg-white/10 transition-all text-left active:scale-95 shadow-2xs"
+              onClick={() => setIsAccountMenuOpen((prev) => !prev)}
+              aria-label="Buka menu akun"
+              aria-expanded={isAccountMenuOpen}
+              className="flex h-9 cursor-pointer items-center gap-2 rounded-full border border-black/[0.07] bg-white/60 py-1 pl-1 pr-2 text-left transition-colors hover:bg-white active:scale-95 dark:border-white/10 dark:bg-white/[0.05] dark:hover:bg-white/[0.09] sm:pr-2.5"
             >
-              <div className="h-6 w-6 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold text-xs flex items-center justify-center shrink-0 font-mono">
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-zinc-950 font-mono text-[10px] font-bold text-white dark:bg-white dark:text-zinc-950">
                 {currentUser.nama.charAt(0)}
-              </div>
-              <div className="hidden sm:block text-[11px] leading-tight max-w-[120px] truncate">
-                <div className="font-semibold text-zinc-900 dark:text-white truncate">
+              </span>
+
+              <span className="hidden min-w-0 md:block">
+                <span className="block max-w-[110px] truncate text-[11px] font-semibold leading-tight text-zinc-900 dark:text-white">
                   {currentUser.nama.split(' ')[0]}
-                </div>
-                <div className="text-[10px] text-zinc-500 dark:text-zinc-400 capitalize font-mono">
+                </span>
+                <span className="block font-mono text-[9px] uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400">
                   {currentUser.role}
-                </div>
-              </div>
-              <ChevronDown className="w-3.5 h-3.5 text-zinc-400" />
+                </span>
+              </span>
+
+              <ChevronDown
+                className={`h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform duration-300 ${
+                  isAccountMenuOpen ? 'rotate-180' : ''
+                }`}
+                strokeWidth={1.75}
+              />
             </button>
 
-            {/* Account Switcher Dropdown Modal */}
             {isAccountMenuOpen && (
-              <div className="absolute right-0 mt-3 w-80 p-2 rounded-2xl bg-zinc-200/60 dark:bg-white/[0.03] border border-zinc-200 dark:border-white/10 shadow-2xl backdrop-blur-2xl z-50 animate-in fade-in slide-in-from-top-2">
-                <div className="bg-white dark:bg-[#09090b] border border-zinc-100 dark:border-white/5 rounded-xl p-2 text-xs space-y-1">
-                  <div className="px-3 py-2 border-b border-zinc-100 dark:border-white/10 font-bold text-zinc-900 dark:text-white flex items-center justify-between">
-                    <span className="text-xs tracking-tight">Pilih Akun Pengguna</span>
-                    <span className="text-[9px] font-mono uppercase tracking-widest px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-white/10 text-zinc-500 dark:text-zinc-400">Multi-User</span>
-                  </div>
+              <div className="absolute right-0 z-50 mt-2 w-[min(20rem,calc(100vw-1.5rem))] rounded-[1.25rem] border border-black/[0.07] bg-[#FBFAF7]/95 p-1.5 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-[#0B0C0E]/95">
+                <div className="flex items-center justify-between gap-2 px-3 py-2">
+                  <span className="text-xs font-semibold tracking-tight text-zinc-900 dark:text-white">
+                    Pilih Akun
+                  </span>
+                  <span className="rounded-full border border-black/[0.06] bg-white/70 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-zinc-500 dark:border-white/10 dark:bg-white/[0.05] dark:text-zinc-400">
+                    {allUsers.length} akun
+                  </span>
+                </div>
 
-                  <div className="max-h-60 overflow-y-auto space-y-1 py-1 custom-scrollbar">
-                    {allUsers.map((u) => {
-                      const isSelected = u.id === currentUser.id;
-                      return (
-                        <button
-                          key={u.id}
-                          onClick={() => handleSelectUser(u)}
-                          className={`w-full flex items-center justify-between p-2.5 rounded-xl transition-all text-left ${
-                            isSelected
-                              ? 'bg-zinc-100 dark:bg-white/10 border border-zinc-200 dark:border-white/15'
-                              : 'hover:bg-zinc-50 dark:hover:bg-white/[0.03]'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 truncate pr-2">
-                            <div
-                              className={`h-7 w-7 rounded-lg font-bold text-[11px] flex items-center justify-center shrink-0 font-mono ${
-                                u.role === 'pusat'
-                                  ? 'bg-indigo-600 text-white'
-                                  : u.role === 'cabang'
-                                  ? 'bg-emerald-600 text-white'
-                                  : 'bg-amber-600 text-white'
-                              }`}
-                            >
-                              {u.nama.charAt(0)}
+                <div className="max-h-64 space-y-0.5 overflow-y-auto py-0.5">
+                  {allUsers.map((u) => {
+                    const isSelected = u.id === currentUser.id;
+                    const avatarClass =
+                      u.role === 'pusat'
+                        ? 'bg-sky-600 text-white'
+                        : u.role === 'cabang'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-amber-600 text-white';
+
+                    return (
+                      <button
+                        key={u.id}
+                        onClick={() => handleSelectUser(u)}
+                        className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-xl p-2.5 text-left transition-colors ${
+                          isSelected
+                            ? 'bg-sky-500/[0.08] dark:bg-sky-400/[0.1]'
+                            : 'hover:bg-black/[0.03] dark:hover:bg-white/[0.05]'
+                        }`}
+                      >
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <span
+                            className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg font-mono text-[11px] font-bold ${avatarClass}`}
+                          >
+                            {u.nama.charAt(0)}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="truncate text-xs font-semibold text-zinc-900 dark:text-white">
+                              {u.nama}
                             </div>
-                            <div className="truncate">
-                              <div className="font-semibold text-zinc-900 dark:text-white truncate">
-                                {u.nama}
-                              </div>
-                              <div className="text-[10px] text-zinc-500 font-mono">
-                                {u.email}
-                              </div>
+                            <div className="truncate font-mono text-[10px] text-zinc-500 dark:text-zinc-400">
+                              {u.email}
                             </div>
                           </div>
+                        </div>
 
-                          {isSelected && <Check className="w-4 h-4 text-zinc-900 dark:text-white shrink-0" />}
-                        </button>
-                      );
-                    })}
-                  </div>
+                        {isSelected && (
+                          <Check
+                            className="h-4 w-4 shrink-0 text-sky-600 dark:text-sky-400"
+                            strokeWidth={2}
+                          />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
 
-                  {/* Logout Action */}
-                  <div className="pt-1 border-t border-zinc-100 dark:border-white/10">
-                    <button
-                      onClick={() => {
-                        setIsAccountMenuOpen(false);
-                        onLogout();
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl text-xs font-semibold transition-colors"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      <span>Keluar dari Akun (Logout)</span>
-                    </button>
-                  </div>
+                <div className="mt-1 border-t border-black/[0.06] pt-1 dark:border-white/10">
+                  <button
+                    onClick={() => {
+                      setIsAccountMenuOpen(false);
+                      onLogout();
+                    }}
+                    className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 transition-colors hover:bg-rose-500/[0.08] dark:text-rose-400"
+                  >
+                    <LogOut className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    <span>Keluar dari akun</span>
+                  </button>
                 </div>
               </div>
             )}
@@ -220,4 +264,3 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
-

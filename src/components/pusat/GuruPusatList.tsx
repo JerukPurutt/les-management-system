@@ -1,6 +1,21 @@
 import React, { useState } from 'react';
 import { Guru, Cabang, Siswa, User, Jenjang } from '../../types';
-import { Building2, GraduationCap, Plus, UserCheck, ShieldCheck, Check, X, UserCog, KeyRound, IdCard, Eye, ChevronDown, ChevronUp, Phone, MapPin, Calendar } from 'lucide-react';
+import {
+  Building2,
+  GraduationCap,
+  Plus,
+  UserCheck,
+  ShieldCheck,
+  Check,
+  X,
+  UserCog,
+  IdCard,
+  Eye,
+  ChevronDown,
+  Phone,
+  MapPin,
+  Calendar,
+} from 'lucide-react';
 import { countTeacherAssignedStudents, getJenjangLabel } from '../../utils/helpers';
 import { Badge } from '../common/Badge';
 
@@ -27,6 +42,20 @@ interface GuruPusatListProps {
   ) => void;
 }
 
+const INPUT =
+  'w-full rounded-xl border border-black/[0.08] bg-white px-3.5 py-2.5 text-xs font-medium text-zinc-900 outline-none transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] placeholder:text-zinc-500 focus:border-sky-500/50 focus:ring-4 focus:ring-sky-500/10 dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:placeholder:text-zinc-400';
+
+const LABEL = 'mb-1.5 block text-[11px] font-medium text-zinc-600 dark:text-zinc-300';
+
+const MODAL =
+  'reveal max-h-[calc(100dvh-1.5rem)] w-full overflow-y-auto rounded-[1.75rem] border border-white/10 bg-white shadow-[0_24px_80px_-24px_rgba(0,0,0,0.4)] dark:bg-[#0D0E10]';
+
+const modalButton =
+  'grid h-8 w-8 cursor-pointer place-items-center rounded-full text-zinc-400 transition-colors hover:bg-black/[0.04] hover:text-zinc-700 dark:hover:bg-white/[0.06] dark:hover:text-zinc-200';
+
+const iconButton =
+  'grid h-9 w-9 cursor-pointer place-items-center rounded-full border border-black/[0.07] text-zinc-500 transition-all duration-300 active:scale-95 dark:border-white/10 dark:text-zinc-400';
+
 export const GuruPusatList: React.FC<GuruPusatListProps> = ({
   guruList,
   cabangList,
@@ -46,14 +75,22 @@ export const GuruPusatList: React.FC<GuruPusatListProps> = ({
   const [selectedCabangIds, setSelectedCabangIds] = useState<string[]>(['cab-1']);
   const [createdInfo, setCreatedInfo] = useState<{ nip: string; pass: string; role: string; nama: string } | null>(null);
 
-  // Role Promotion Modal State
   const [selectedGuruForRole, setSelectedGuruForRole] = useState<Guru | null>(null);
   const [targetRole, setTargetRole] = useState<'guru' | 'cabang'>('cabang');
   const [targetCabangId, setTargetCabangId] = useState<string>('cab-1');
 
-  // Detail Modal & Accordion Expand States
   const [detailModalGuru, setDetailModalGuru] = useState<Guru | null>(null);
   const [expandedGuruIds, setExpandedGuruIds] = useState<string[]>([]);
+
+  const findAccount = (guru: Guru) =>
+    users.find((u) => u.teacherId === guru.id || u.email.toLowerCase() === guru.email.toLowerCase());
+
+  const leaderCount = guruList.filter((g) => findAccount(g)?.role === 'cabang').length;
+  const totalAssigned = guruList.reduce(
+    (sum, g) => sum + countTeacherAssignedStudents(g.id, siswaList),
+    0
+  );
+  const totalCapacity = guruList.length * 6;
 
   const toggleExpandGuru = (guruId: string) => {
     setExpandedGuruIds((prev) =>
@@ -77,7 +114,6 @@ export const GuruPusatList: React.FC<GuruPusatListProps> = ({
     setNoTelpInput('');
     setAlamatInput('');
 
-    // Auto generate next NIP
     const nipNums = guruList
       .map((g) => {
         const m = (g.noPegawai || '').match(/\d+/);
@@ -85,9 +121,8 @@ export const GuruPusatList: React.FC<GuruPusatListProps> = ({
       })
       .filter((n) => !isNaN(n) && n > 0);
     const maxNip = nipNums.length > 0 ? Math.max(...nipNums) : 3000;
-    const autoNip = `NIP-${maxNip + 1}`;
 
-    setNoPegawaiInput(autoNip);
+    setNoPegawaiInput(`NIP-${maxNip + 1}`);
     setTanggalLahirInput('1995-05-15');
     setIsModalOpen(true);
   };
@@ -122,12 +157,9 @@ export const GuruPusatList: React.FC<GuruPusatListProps> = ({
   };
 
   const handleOpenRoleModal = (guru: Guru) => {
-    const matchedUser = users.find(
-      (u) => u.teacherId === guru.id || u.email.toLowerCase() === guru.email.toLowerCase()
-    );
-    const currentRole = matchedUser?.role === 'cabang' ? 'cabang' : 'guru';
+    const matchedUser = findAccount(guru);
     setSelectedGuruForRole(guru);
-    setTargetRole(currentRole);
+    setTargetRole(matchedUser?.role === 'cabang' ? 'cabang' : 'guru');
     setTargetCabangId(matchedUser?.cabangId || guru.cabangIds[0] || 'cab-1');
   };
 
@@ -139,573 +171,734 @@ export const GuruPusatList: React.FC<GuruPusatListProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      {/* Title & Eyebrow */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] uppercase tracking-[0.2em] font-mono font-medium bg-zinc-200/60 dark:bg-white/5 border border-zinc-300/80 dark:border-white/10 text-zinc-600 dark:text-zinc-400 mb-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> Academic Staff Directory
+    <div className="space-y-5 sm:space-y-6">
+      {/* Masthead */}
+      <header className="reveal flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+        <div className="max-w-2xl">
+          <div className="inline-flex items-center gap-2 rounded-full border border-black/[0.07] bg-white/70 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.18em] text-zinc-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-sky-600 dark:bg-sky-400" />
+            Pusat · Academic Staff
           </div>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-3">
-            <UserCheck className="w-6 h-6 text-indigo-500" /> Daftar Guru & Akun Pengajar (Pusat)
-          </h2>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-            Kelola akun guru, ubah peran Guru Biasa ↔ Pimpinan Cabang, & alokasi mengajar
+
+          <h1 className="mt-5 text-4xl font-semibold leading-[0.98] tracking-[-0.045em] text-zinc-950 dark:text-white sm:text-5xl">
+            Daftar <span className="text-sky-700 dark:text-sky-400">Guru</span>
+          </h1>
+          <p className="mt-4 max-w-xl text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+            Kelola akun pengajar, atur peran guru dan pimpinan cabang, serta pantau alokasi
+            siswa di seluruh jaringan.
           </p>
         </div>
 
         <button
           onClick={handleOpenAddModal}
-          className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-900 font-semibold text-xs transition-all shadow-xs flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+          className="group inline-flex cursor-pointer items-center gap-3 self-start rounded-full bg-zinc-950 py-2 pl-5 pr-2 text-xs font-semibold text-white transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:-translate-y-0.5 hover:bg-zinc-800 active:scale-[0.98] dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 lg:self-auto"
         >
-          <Plus className="w-4 h-4" />
-          <span>Tambah Guru & Buat Akun</span>
+          <span>Tambah Guru</span>
+          <span className="grid h-7 w-7 place-items-center rounded-full bg-white/15 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:rotate-90 dark:bg-zinc-950/10">
+            <Plus className="h-3.5 w-3.5" strokeWidth={2} />
+          </span>
         </button>
+      </header>
+
+      {/* Roster summary */}
+      <div className="reveal grid grid-cols-3 divide-x divide-black/[0.06] overflow-hidden rounded-[1.5rem] border border-black/[0.07] bg-white/70 dark:divide-white/[0.06] dark:border-white/[0.08] dark:bg-white/[0.03]">
+        <div className="px-4 py-4 sm:px-6">
+          <div className="font-mono text-2xl font-semibold tabular-nums text-zinc-950 dark:text-white">
+            {guruList.length}
+          </div>
+          <div className="mt-1 text-[9px] font-medium uppercase tracking-[0.16em] text-zinc-400 sm:text-[10px]">
+            Total guru
+          </div>
+        </div>
+        <div className="px-4 py-4 sm:px-6">
+          <div className="font-mono text-2xl font-semibold tabular-nums text-amber-600 dark:text-amber-400">
+            {leaderCount}
+          </div>
+          <div className="mt-1 text-[9px] font-medium uppercase tracking-[0.16em] text-zinc-400 sm:text-[10px]">
+            Pimpinan cabang
+          </div>
+        </div>
+        <div className="px-4 py-4 sm:px-6">
+          <div className="font-mono text-2xl font-semibold tabular-nums text-sky-700 dark:text-sky-400">
+            {totalAssigned}
+            <span className="text-sm font-normal text-zinc-400"> / {totalCapacity}</span>
+          </div>
+          <div className="mt-1 text-[9px] font-medium uppercase tracking-[0.16em] text-zinc-400 sm:text-[10px]">
+            Slot terisi
+          </div>
+        </div>
       </div>
 
-      {/* Guru Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {guruList.map((guru) => {
-          const assignedCount = countTeacherAssignedStudents(guru.id, siswaList);
-          const assignedCabangNames = cabangList
-            .filter((c) => guru.cabangIds.includes(c.id))
-            .map((c) => c.nama);
-          const mySiswa = siswaList.filter((s) => s.guruId === guru.id && !s.deletedAt && s.status === 'aktif');
+      {/* Staff roster */}
+      <section className="reveal overflow-hidden rounded-[1.75rem] border border-black/[0.07] bg-white/90 dark:border-white/[0.08] dark:bg-white/[0.035]">
+        <div className="flex items-center justify-between gap-4 border-b border-black/[0.06] px-5 py-4 dark:border-white/[0.06] sm:px-6">
+          <div>
+            <h2 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-white">
+              Roster Pengajar
+            </h2>
+            <p className="mt-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+              Kapasitas ideal 6 siswa per guru · klik baris untuk melihat siswa
+            </p>
+          </div>
+          <span className="hidden font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-400 sm:block">
+            {guruList.length} akun
+          </span>
+        </div>
 
-          // Find user account matching this teacher
-          const matchedUser = users.find(
-            (u) => u.teacherId === guru.id || u.email.toLowerCase() === guru.email.toLowerCase()
-          );
-          const isBranchLeader = matchedUser?.role === 'cabang';
-          const nip = guru.noPegawai || matchedUser?.noPegawai || 'NIP-1001';
-          const isExpanded = expandedGuruIds.includes(guru.id);
-
-          return (
-            <div
-              key={guru.id}
-              className="p-1 rounded-2xl bg-zinc-200/50 dark:bg-white/[0.03] border border-zinc-200/80 dark:border-white/10 shadow-xs hover:border-zinc-300 dark:hover:border-white/20 transition-all group"
+        {guruList.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
+            <span className="grid h-12 w-12 place-items-center rounded-full border border-black/[0.07] bg-black/[0.02] text-zinc-400 dark:border-white/10 dark:bg-white/[0.04]">
+              <UserCheck className="h-5 w-5" strokeWidth={1.5} />
+            </span>
+            <div>
+              <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                Belum ada guru terdaftar
+              </p>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                Tambah guru pertama untuk mulai mengelola pengajar.
+              </p>
+            </div>
+            <button
+              onClick={handleOpenAddModal}
+              className="cursor-pointer rounded-full border border-black/[0.08] px-4 py-2 text-[11px] font-semibold text-zinc-700 transition-colors hover:bg-black/[0.03] dark:border-white/10 dark:text-zinc-200 dark:hover:bg-white/[0.05]"
             >
-              <div className="h-full bg-white dark:bg-[#09090b] border border-zinc-100 dark:border-white/5 rounded-[calc(1rem-0.25rem)] p-5 space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="font-bold text-zinc-900 dark:text-white text-sm tracking-tight">
-                      {guru.nama}
-                    </h3>
-                    <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400 font-mono mt-1">
-                      <span className="text-indigo-600 dark:text-indigo-400 font-bold flex items-center gap-1">
-                        <IdCard className="w-3.5 h-3.5" /> {nip}
-                      </span>
+              Tambah Guru
+            </button>
+          </div>
+        ) : (
+          <div className="divide-y divide-black/[0.05] dark:divide-white/[0.05]">
+            {guruList.map((guru) => {
+              const assignedCount = countTeacherAssignedStudents(guru.id, siswaList);
+              const assignedCabangNames = cabangList
+                .filter((c) => guru.cabangIds.includes(c.id))
+                .map((c) => c.nama);
+              const mySiswa = siswaList.filter(
+                (s) => s.guruId === guru.id && !s.deletedAt && s.status === 'aktif'
+              );
+
+              const matchedUser = findAccount(guru);
+              const isBranchLeader = matchedUser?.role === 'cabang';
+              const nip = guru.noPegawai || matchedUser?.noPegawai || 'NIP-1001';
+              const isExpanded = expandedGuruIds.includes(guru.id);
+              const slotRatio = Math.min(1, assignedCount / 6);
+
+              return (
+                <div key={guru.id} className="group">
+                  <div className="grid grid-cols-1 gap-4 px-5 py-5 transition-colors duration-300 hover:bg-black/[0.015] dark:hover:bg-white/[0.02] md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.9fr)_auto] md:items-center md:px-6">
+                    <div className="flex min-w-0 items-center gap-4">
+                      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-black/[0.07] bg-black/[0.02] font-mono text-xs font-semibold text-zinc-500 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:border-sky-500/20 group-hover:bg-sky-500/[0.06] group-hover:text-sky-700 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-400 dark:group-hover:text-sky-400">
+                        {guru.nama.charAt(0)}
+                      </div>
+
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="truncate text-[13px] font-semibold tracking-tight text-zinc-900 dark:text-white">
+                            {guru.nama}
+                          </h3>
+                          <Badge variant={isBranchLeader ? 'warning' : 'info'}>
+                            {isBranchLeader ? 'Pimpinan Cabang' : 'Guru Biasa'}
+                          </Badge>
+                        </div>
+
+                        <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 font-mono text-[10px] text-zinc-500 dark:text-zinc-400">
+                          <span className="flex items-center gap-1 text-sky-700 dark:text-sky-400">
+                            <IdCard className="h-3 w-3" strokeWidth={1.75} /> {nip}
+                          </span>
+                          <span className="h-1 w-1 rounded-full bg-zinc-300 dark:bg-zinc-600" />
+                          <span>{getJenjangLabel(guru.jenjang)}</span>
+                          <span className="h-1 w-1 rounded-full bg-zinc-300 dark:bg-zinc-600" />
+                          <span>{mySiswa.length} siswa aktif</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="font-medium text-zinc-500 dark:text-zinc-400">Slot siswa</span>
+                        <span
+                          className={`font-mono font-semibold tabular-nums ${
+                            assignedCount >= 6
+                              ? 'text-rose-600 dark:text-rose-400'
+                              : 'text-zinc-600 dark:text-zinc-300'
+                          }`}
+                        >
+                          {assignedCount} / 6
+                        </span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-zinc-100 dark:bg-white/[0.06]">
+                        <div
+                          className={`h-full w-full origin-left rounded-full transition-transform duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+                            assignedCount >= 6
+                              ? 'bg-rose-500'
+                              : assignedCount >= 4
+                              ? 'bg-amber-500'
+                              : 'bg-emerald-500'
+                          }`}
+                          style={{ transform: `scaleX(${slotRatio})` }}
+                        />
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5 pt-0.5">
+                        {assignedCabangNames.length === 0 ? (
+                          <span className="text-[9px] font-mono text-zinc-400">Tanpa cabang</span>
+                        ) : (
+                          assignedCabangNames.map((cName) => (
+                            <span
+                              key={cName}
+                              className="rounded-full border border-black/[0.06] bg-black/[0.02] px-2 py-0.5 text-[9px] font-medium text-zinc-600 dark:border-white/[0.07] dark:bg-white/[0.04] dark:text-zinc-300"
+                            >
+                              {cName}
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 md:justify-end">
+                      <button
+                        onClick={() => setDetailModalGuru(guru)}
+                        aria-label={`Lihat detail ${guru.nama}`}
+                        title="Lihat Detail Profil Guru"
+                        className={`${iconButton} hover:border-amber-500/25 hover:bg-amber-500/[0.06] hover:text-amber-600 dark:hover:text-amber-400`}
+                      >
+                        <Eye className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      </button>
+
+                      <button
+                        onClick={() => handleOpenRoleModal(guru)}
+                        aria-label={`Ubah peran ${guru.nama}`}
+                        title="Ubah Peran (Guru Biasa / Pimpinan Cabang)"
+                        className={`${iconButton} hover:border-sky-500/25 hover:bg-sky-500/[0.06] hover:text-sky-700 dark:hover:text-sky-400`}
+                      >
+                        <UserCog className="h-3.5 w-3.5" strokeWidth={1.75} />
+                      </button>
+
+                      <button
+                        onClick={() => toggleExpandGuru(guru.id)}
+                        aria-label={isExpanded ? `Sembunyikan siswa ${guru.nama}` : `Tampilkan siswa ${guru.nama}`}
+                        aria-expanded={isExpanded}
+                        className={`${iconButton} hover:border-zinc-400/30 hover:bg-black/[0.03] hover:text-zinc-800 dark:hover:bg-white/[0.06] dark:hover:text-white`}
+                      >
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+                            isExpanded ? 'rotate-180' : ''
+                          }`}
+                          strokeWidth={1.75}
+                        />
+                      </button>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <Badge variant={guru.jenjang === 'SMA_SMK' ? 'purple' : guru.jenjang === 'SMP' ? 'info' : 'success'}>
-                      {getJenjangLabel(guru.jenjang)}
-                    </Badge>
-
-                    {/* Role Badge: Pimpinan Cabang vs Guru Biasa */}
-                    {isBranchLeader ? (
-                      <Badge variant="warning" className="text-[9px]">
-                        🏢 Pimpinan Cabang
-                      </Badge>
-                    ) : (
-                      <Badge variant="info" className="text-[9px]">
-                        🎓 Guru Biasa
-                      </Badge>
-                    )}
-
-                    {/* Detail Button */}
-                    <button
-                      onClick={() => setDetailModalGuru(guru)}
-                      className="p-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 rounded-lg border border-amber-500/20 transition-colors cursor-pointer"
-                      title="Lihat Detail Profil Guru"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                    </button>
-
-                    <button
-                      onClick={() => handleOpenRoleModal(guru)}
-                      className="p-1.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/20 rounded-lg border border-indigo-500/20 transition-colors cursor-pointer"
-                      title="Ubah Peran (Guru Biasa / Pimpinan Cabang)"
-                    >
-                      <UserCog className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Slot Counter Indicator */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-500 dark:text-zinc-400 flex items-center gap-1.5 font-medium">
-                      <GraduationCap className="w-4 h-4 text-indigo-500" /> Slot Siswa Diajar:
-                    </span>
-                    <span className={`font-mono font-bold ${assignedCount >= 6 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                      {assignedCount} / 6 {assignedCount >= 6 ? '(Penuh)' : ''}
-                    </span>
-                  </div>
-                  <div className="w-full bg-zinc-100 dark:bg-zinc-800/80 h-2 rounded-full overflow-hidden p-0.5 border border-zinc-200/40 dark:border-white/5">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        assignedCount >= 6
-                          ? 'bg-rose-500'
-                          : assignedCount >= 4
-                          ? 'bg-amber-500'
-                          : 'bg-emerald-500'
-                      }`}
-                      style={{ width: `${(assignedCount / 6) * 100}%` }}
-                    ></div>
-                  </div>
-                </div>
-
-                {/* Cabang assignments */}
-                <div className="pt-3 border-t border-zinc-100 dark:border-white/5 flex items-center gap-2 text-xs overflow-hidden">
-                  <Building2 className="w-4 h-4 text-zinc-400 shrink-0" />
-                  <span className="text-zinc-400 text-[10px] uppercase font-mono tracking-wider">Cabang:</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {assignedCabangNames.map((cName, idx) => (
-                      <span
-                        key={idx}
-                        className="text-[10px] bg-zinc-100 dark:bg-white/5 text-zinc-700 dark:text-zinc-300 px-2.5 py-0.5 rounded-full border border-zinc-200/60 dark:border-white/10 font-medium"
-                      >
-                        {cName}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Collapsible Student list taught by this teacher */}
-                <div className="pt-3 border-t border-zinc-100 dark:border-white/5 text-xs space-y-2">
-                  <button
-                    onClick={() => toggleExpandGuru(guru.id)}
-                    className="w-full flex items-center justify-between p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-950/60 hover:bg-zinc-100 dark:hover:bg-white/5 border border-zinc-200/60 dark:border-white/5 transition-colors cursor-pointer text-left"
-                  >
-                    <span className="font-bold text-zinc-800 dark:text-zinc-200 text-xs">
-                      Siswa Diajar ({mySiswa.length} Siswa)
-                    </span>
-                    <span className="flex items-center gap-1 text-[10px] font-mono font-semibold text-indigo-600 dark:text-indigo-400">
-                      <span>{isExpanded ? 'Sembunyikan' : 'Tampilkan'}</span>
-                      {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                    </span>
-                  </button>
-
                   {isExpanded && (
-                    <div className="pt-1 space-y-1.5">
+                    <div className="border-t border-black/[0.05] bg-black/[0.015] px-5 py-4 dark:border-white/[0.05] dark:bg-white/[0.02] sm:px-6">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-zinc-400">
+                          Siswa diajar
+                        </span>
+                        <span className="font-mono text-[10px] text-zinc-400">
+                          {mySiswa.length} siswa
+                        </span>
+                      </div>
+
                       {mySiswa.length === 0 ? (
-                        <p className="text-zinc-400 dark:text-zinc-500 italic text-xs p-2 text-center">
+                        <p className="py-3 text-center text-[11px] text-zinc-400 dark:text-zinc-500">
                           Belum ada siswa yang ditugaskan ke guru ini.
                         </p>
                       ) : (
-                        mySiswa.map((s) => (
-                          <div
-                            key={s.id}
-                            className="flex items-center justify-between p-2.5 rounded-xl bg-zinc-50/80 dark:bg-zinc-950/80 border border-zinc-200/40 dark:border-white/5"
-                          >
-                            <span className="text-zinc-800 dark:text-zinc-200 font-semibold text-xs">{s.nama}</span>
-                            <span className="text-zinc-500 dark:text-zinc-400 font-mono text-[10px]">
-                              {getJenjangLabel(s.jenjang, s.kelas, s.status)}
-                            </span>
-                          </div>
-                        ))
+                        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                          {mySiswa.map((s) => (
+                            <div
+                              key={s.id}
+                              className="flex items-center justify-between gap-3 rounded-xl border border-black/[0.05] bg-white/70 px-3 py-2 dark:border-white/[0.06] dark:bg-white/[0.03]"
+                            >
+                              <span className="truncate text-[11px] font-medium text-zinc-800 dark:text-zinc-200">
+                                {s.nama}
+                              </span>
+                              <span className="shrink-0 font-mono text-[9px] text-zinc-500 dark:text-zinc-400">
+                                {getJenjangLabel(s.jenjang, s.kelas, s.status)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
                   )}
                 </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       {/* Add Guru & Account Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="p-1 rounded-2xl bg-zinc-200/80 dark:bg-white/10 border border-zinc-300 dark:border-white/20 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="bg-white dark:bg-[#09090b] border border-zinc-100 dark:border-white/5 rounded-[calc(1rem-0.25rem)] p-6 space-y-5">
-              <div className="flex items-center justify-between border-b border-zinc-100 dark:border-white/5 pb-4">
-                <h3 className="font-bold text-zinc-900 dark:text-white text-base flex items-center gap-2">
-                  <UserCheck className="w-5 h-5 text-indigo-500" /> Tambah Guru & Buat Akun (Pusat)
-                </h3>
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              {!createdInfo ? (
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                      Nama Guru & Gelar *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="mis. Farhan Ramadhan, S.Pd"
-                      value={namaInput}
-                      onChange={(e) => setNamaInput(e.target.value)}
-                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all font-medium"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5 flex items-center justify-between">
-                        <span>No. Pegawai (NIP)</span>
-                        <span className="text-[9px] bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded font-mono font-bold">Auto</span>
-                      </label>
-                      <input
-                        type="text"
-                        disabled
-                        readOnly
-                        value={noPegawaiInput}
-                        className="w-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-zinc-700 dark:text-zinc-300 font-mono font-bold cursor-not-allowed"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                        Tanggal Lahir (Pass) *
-                      </label>
-                      <input
-                        type="date"
-                        required
-                        value={tanggalLahirInput}
-                        onChange={(e) => setTanggalLahirInput(e.target.value)}
-                        className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all font-medium"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                      Alamat Lengkap Tempat Tinggal *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="mis. Jl. Kebon Jeruk No. 45, Jakarta Barat"
-                      value={alamatInput}
-                      onChange={(e) => setAlamatInput(e.target.value)}
-                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all font-medium"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                        No. WhatsApp *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="08123456789"
-                        value={noTelpInput}
-                        onChange={(e) => setNoTelpInput(e.target.value)}
-                        className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all font-medium"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                        Jenjang Kategori *
-                      </label>
-                      <select
-                        value={jenjangInput}
-                        onChange={(e) => setJenjangInput(e.target.value as Jenjang)}
-                        className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all font-medium"
-                      >
-                        <option value="TK">TK</option>
-                        <option value="SD">SD</option>
-                        <option value="SMP">SMP</option>
-                        <option value="SMA_SMK">SMA / SMK</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                      Peran Hak Akses *
-                    </label>
-                    <select
-                      value={accountRoleInput}
-                      onChange={(e) => setAccountRoleInput(e.target.value as 'guru' | 'cabang')}
-                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all font-bold text-indigo-600 dark:text-indigo-400"
-                    >
-                      <option value="guru">🎓 Guru Biasa</option>
-                      <option value="cabang">🏢 Pimpinan Cabang</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                      Penugasan Lokasi Cabang Mengajar:
-                    </label>
-                    <div className="space-y-1.5 bg-zinc-50 dark:bg-zinc-950 p-3 rounded-xl border border-zinc-200 dark:border-white/10">
-                      {cabangList.map((c) => (
-                        <label key={c.id} className="flex items-center gap-2.5 text-xs cursor-pointer text-zinc-800 dark:text-zinc-200 font-medium">
-                          <input
-                            type="checkbox"
-                            checked={selectedCabangIds.includes(c.id)}
-                            onChange={() => toggleCabangSelect(c.id)}
-                            className="rounded text-indigo-600 focus:ring-0"
-                          />
-                          <span>{c.nama}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-3 pt-3 border-t border-zinc-100 dark:border-white/5">
-                    <button
-                      type="button"
-                      onClick={() => setIsModalOpen(false)}
-                      className="px-4 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 cursor-pointer"
-                    >
-                      Batal
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-5 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-xs transition-colors cursor-pointer"
-                    >
-                      Simpan & Buat Akun
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <div className="space-y-4">
-                  <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 space-y-2">
-                    <div className="flex items-center gap-2 font-bold text-xs">
-                      <Check className="w-4 h-4" /> Guru & Akun Login Berhasil Dibuat!
-                    </div>
-                    <p className="text-xs opacity-90">Gunakan NIP & Tanggal Lahir untuk masuk ke sistem:</p>
-                    <div className="bg-zinc-50 dark:bg-zinc-950 p-3 rounded-lg border border-zinc-200 dark:border-white/10 text-xs font-mono space-y-1 text-zinc-800 dark:text-zinc-200">
-                      <p>Nama Guru: <span className="font-bold text-zinc-900 dark:text-white">{createdInfo.nama}</span></p>
-                      <p>No. Pegawai (NIP Login): <span className="text-indigo-600 dark:text-indigo-400 font-bold">{createdInfo.nip}</span></p>
-                      <p>Password (Tgl Lahir): <span className="text-amber-600 dark:text-amber-400 font-bold">{createdInfo.pass}</span></p>
-                      <p>Hak Akses: <span className="font-bold uppercase text-emerald-600 dark:text-emerald-400">{createdInfo.role === 'cabang' ? '🏢 Pimpinan Cabang' : '🎓 Guru Biasa'}</span></p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => setIsModalOpen(false)}
-                    className="w-full py-2.5 bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 text-xs font-semibold rounded-xl cursor-pointer shadow-xs transition-colors"
-                  >
-                    Tutup & Kembali
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Role Promotion Modal (Pimpinan Pusat Only) */}
-      {selectedGuruForRole && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="p-1 rounded-2xl bg-zinc-200/80 dark:bg-white/10 border border-zinc-300 dark:border-white/20 shadow-2xl max-w-md w-full">
-            <div className="bg-white dark:bg-[#09090b] border border-zinc-100 dark:border-white/5 rounded-[calc(1rem-0.25rem)] p-6 space-y-5">
-              <div className="flex items-center justify-between border-b border-zinc-100 dark:border-white/5 pb-4">
-                <h3 className="font-bold text-zinc-900 dark:text-white text-base flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-amber-500" /> Ubah Peran Guru
-                </h3>
-                <button
-                  onClick={() => setSelectedGuruForRole(null)}
-                  className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <form onSubmit={handleSaveRoleChange} className="space-y-4">
-                <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-white/10 space-y-1">
-                  <p className="font-bold text-zinc-900 dark:text-white text-xs">{selectedGuruForRole.nama}</p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 font-mono">
-                    {selectedGuruForRole.noPegawai || 'NIP-1001'} • {selectedGuruForRole.email}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 backdrop-blur-md sm:p-4">
+          <div role="dialog" aria-modal="true" aria-label="Tambah guru" className={`${MODAL} max-w-lg`}>
+            <div className="flex items-start justify-between gap-4 border-b border-black/[0.06] px-5 py-5 dark:border-white/[0.06] sm:px-6">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-full border border-sky-500/15 bg-sky-500/[0.06] text-sky-600 dark:text-sky-400">
+                  <UserCheck className="h-4 w-4" strokeWidth={1.75} />
+                </span>
+                <div>
+                  <h3 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-white">
+                    Tambah Guru
+                  </h3>
+                  <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                    Akun login dibuat otomatis
                   </p>
+                </div>
+              </div>
+              <button onClick={() => setIsModalOpen(false)} aria-label="Tutup" className={modalButton}>
+                <X className="h-4 w-4" strokeWidth={1.75} />
+              </button>
+            </div>
+
+            {!createdInfo ? (
+              <form onSubmit={handleSubmit} className="space-y-4 px-5 py-5 sm:px-6">
+                <div>
+                  <label className={LABEL}>Nama Guru & Gelar</label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    placeholder="mis. Farhan Ramadhan, S.Pd"
+                    value={namaInput}
+                    onChange={(e) => setNamaInput(e.target.value)}
+                    className={INPUT}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className={`${LABEL} flex items-center justify-between`}>
+                      <span>No. Pegawai (NIP)</span>
+                      <span className="rounded-full bg-sky-500/10 px-2 py-0.5 font-mono text-[9px] font-semibold text-sky-700 dark:text-sky-400">
+                        Auto
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      disabled
+                      readOnly
+                      value={noPegawaiInput}
+                      className={`${INPUT} cursor-not-allowed bg-black/[0.02] font-mono text-zinc-600 dark:bg-white/[0.03] dark:text-zinc-300`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={LABEL}>Tanggal Lahir (Password)</label>
+                    <input
+                      type="date"
+                      required
+                      value={tanggalLahirInput}
+                      onChange={(e) => setTanggalLahirInput(e.target.value)}
+                      className={INPUT}
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
-                    Pilih Peran Baru:
-                  </label>
-                  <div className="space-y-2.5">
-                    <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                      targetRole === 'guru'
-                        ? 'border-indigo-500 bg-indigo-500/10 text-indigo-900 dark:text-indigo-200'
-                        : 'border-zinc-200 dark:border-white/10 hover:bg-zinc-50 dark:hover:bg-white/5 text-zinc-700 dark:text-zinc-300'
-                    }`}>
-                      <input
-                        type="radio"
-                        name="targetRole"
-                        value="guru"
-                        checked={targetRole === 'guru'}
-                        onChange={() => setTargetRole('guru')}
-                        className="mt-0.5 text-indigo-600 focus:ring-0"
-                      />
-                      <div>
-                        <span className="font-bold text-xs block">🎓 Guru Biasa</span>
-                        <span className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                          Memiliki akses jadwal mengajar dan melihat daftar siswa yang diajar saja.
-                        </span>
-                      </div>
-                    </label>
+                  <label className={LABEL}>Alamat Lengkap</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="mis. Jl. Kebon Jeruk No. 45, Jakarta Barat"
+                    value={alamatInput}
+                    onChange={(e) => setAlamatInput(e.target.value)}
+                    className={INPUT}
+                  />
+                </div>
 
-                    <label className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
-                      targetRole === 'cabang'
-                        ? 'border-amber-500 bg-amber-500/10 text-amber-900 dark:text-amber-200'
-                        : 'border-zinc-200 dark:border-white/10 hover:bg-zinc-50 dark:hover:bg-white/5 text-zinc-700 dark:text-zinc-300'
-                    }`}>
-                      <input
-                        type="radio"
-                        name="targetRole"
-                        value="cabang"
-                        checked={targetRole === 'cabang'}
-                        onChange={() => setTargetRole('cabang')}
-                        className="mt-0.5 text-amber-600 focus:ring-0"
-                      />
-                      <div>
-                        <span className="font-bold text-xs block">🏢 Pimpinan Cabang</span>
-                        <span className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                          Memiliki akses penuh manajemen pendaftaran, siswa, keuangan & jadwal di cabang.
-                        </span>
-                      </div>
-                    </label>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className={LABEL}>No. WhatsApp</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="08123456789"
+                      value={noTelpInput}
+                      onChange={(e) => setNoTelpInput(e.target.value)}
+                      className={INPUT}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={LABEL}>Jenjang Kategori</label>
+                    <select
+                      value={jenjangInput}
+                      onChange={(e) => setJenjangInput(e.target.value as Jenjang)}
+                      className={INPUT}
+                    >
+                      <option value="TK">TK</option>
+                      <option value="SD">SD</option>
+                      <option value="SMP">SMP</option>
+                      <option value="SMA_SMK">SMA / SMK</option>
+                    </select>
                   </div>
                 </div>
 
-                {targetRole === 'cabang' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                      Lokasi Cabang yang Dipimpin *
-                    </label>
-                    <select
-                      value={targetCabangId}
-                      onChange={(e) => setTargetCabangId(e.target.value)}
-                      className="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-white/10 rounded-xl px-3.5 py-2.5 text-xs text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all font-medium"
-                    >
-                      {cabangList.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.nama} ({c.alamat})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                <div>
+                  <label className={LABEL}>Peran Hak Akses</label>
+                  <select
+                    value={accountRoleInput}
+                    onChange={(e) => setAccountRoleInput(e.target.value as 'guru' | 'cabang')}
+                    className={INPUT}
+                  >
+                    <option value="guru">Guru Biasa</option>
+                    <option value="cabang">Pimpinan Cabang</option>
+                  </select>
+                </div>
 
-                <div className="flex justify-end gap-3 pt-3 border-t border-zinc-100 dark:border-white/5">
+                <div>
+                  <label className={LABEL}>Penugasan Cabang</label>
+                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                    {cabangList.map((c) => {
+                      const selected = selectedCabangIds.includes(c.id);
+                      return (
+                        <label
+                          key={c.id}
+                          className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl border px-3 py-2.5 text-[11px] font-medium transition-all duration-300 ${
+                            selected
+                              ? 'border-sky-500/30 bg-sky-500/[0.06] text-sky-800 dark:text-sky-300'
+                              : 'border-black/[0.07] text-zinc-600 hover:bg-black/[0.02] dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/[0.04]'
+                          }`}
+                        >
+                          <span className="truncate">{c.nama}</span>
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleCabangSelect(c.id)}
+                            className="h-3.5 w-3.5 rounded border-zinc-300 text-sky-600 focus:ring-sky-500/30 dark:border-zinc-600"
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex flex-col-reverse gap-2 border-t border-black/[0.06] pt-4 dark:border-white/[0.06] sm:flex-row sm:justify-end sm:gap-3">
                   <button
                     type="button"
-                    onClick={() => setSelectedGuruForRole(null)}
-                    className="px-4 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 cursor-pointer"
+                    onClick={() => setIsModalOpen(false)}
+                    className="cursor-pointer rounded-full px-4 py-2.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-black/[0.03] hover:text-zinc-700 dark:hover:bg-white/[0.05] dark:hover:text-zinc-200"
                   >
                     Batal
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-xs transition-colors cursor-pointer"
+                    className="cursor-pointer rounded-full bg-zinc-950 px-5 py-2.5 text-xs font-semibold text-white transition-all duration-300 hover:bg-zinc-800 active:scale-[0.98] dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100"
                   >
-                    Simpan Peran
+                    Simpan & Buat Akun
                   </button>
                 </div>
               </form>
-            </div>
+            ) : (
+              <div className="space-y-4 px-5 py-5 sm:px-6">
+                <div className="flex items-start gap-3 rounded-2xl border border-emerald-500/15 bg-emerald-500/[0.06] p-4">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                    <Check className="h-4 w-4" strokeWidth={2} />
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                      Guru & akun login berhasil dibuat
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-emerald-700/80 dark:text-emerald-400/80">
+                      Gunakan NIP dan tanggal lahir untuk masuk ke sistem.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 rounded-xl border border-black/[0.06] bg-black/[0.02] p-3.5 font-mono text-[11px] text-zinc-700 dark:border-white/[0.06] dark:bg-white/[0.03] dark:text-zinc-300">
+                  <p>
+                    Nama:{' '}
+                    <span className="font-semibold text-zinc-900 dark:text-white">
+                      {createdInfo.nama}
+                    </span>
+                  </p>
+                  <p>
+                    NIP Login:{' '}
+                    <span className="font-semibold text-sky-700 dark:text-sky-400">
+                      {createdInfo.nip}
+                    </span>
+                  </p>
+                  <p>
+                    Password:{' '}
+                    <span className="font-semibold text-amber-600 dark:text-amber-400">
+                      {createdInfo.pass}
+                    </span>
+                  </p>
+                  <p>
+                    Hak akses:{' '}
+                    <span className="font-semibold uppercase text-emerald-600 dark:text-emerald-400">
+                      {createdInfo.role === 'cabang' ? 'Pimpinan Cabang' : 'Guru Biasa'}
+                    </span>
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="w-full cursor-pointer rounded-full bg-zinc-950 py-2.5 text-xs font-semibold text-white transition-all duration-300 hover:bg-zinc-800 active:scale-[0.98] dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100"
+                >
+                  Tutup
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Detail Guru Modal (Pusat) */}
-      {detailModalGuru && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="p-1 rounded-2xl bg-zinc-200/80 dark:bg-white/10 border border-zinc-300 dark:border-white/20 shadow-2xl max-w-md w-full">
-            <div className="bg-white dark:bg-[#09090b] border border-zinc-100 dark:border-white/5 rounded-[calc(1rem-0.25rem)] p-6 space-y-5">
-              <div className="flex items-center justify-between border-b border-zinc-100 dark:border-white/5 pb-4">
-                <h3 className="font-bold text-zinc-900 dark:text-white text-base flex items-center gap-2">
-                  <Eye className="w-5 h-5 text-amber-500" /> Detail Informasi Guru
-                </h3>
+      {/* Role Promotion Modal */}
+      {selectedGuruForRole && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 backdrop-blur-md sm:p-4">
+          <div role="dialog" aria-modal="true" aria-label="Ubah peran guru" className={`${MODAL} max-w-md`}>
+            <div className="flex items-start justify-between gap-4 border-b border-black/[0.06] px-5 py-5 dark:border-white/[0.06] sm:px-6">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-full border border-amber-500/15 bg-amber-500/[0.06] text-amber-600 dark:text-amber-400">
+                  <ShieldCheck className="h-4 w-4" strokeWidth={1.75} />
+                </span>
+                <div>
+                  <h3 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-white">
+                    Ubah Peran
+                  </h3>
+                  <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                    Atur hak akses pengajar
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedGuruForRole(null)} aria-label="Tutup" className={modalButton}>
+                <X className="h-4 w-4" strokeWidth={1.75} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveRoleChange} className="space-y-4 px-5 py-5 sm:px-6">
+              <div className="flex items-center gap-3 rounded-2xl border border-black/[0.06] bg-black/[0.02] p-3.5 dark:border-white/[0.06] dark:bg-white/[0.03]">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-zinc-950 font-mono text-xs font-semibold text-white dark:bg-white dark:text-zinc-950">
+                  {selectedGuruForRole.nama.charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold text-zinc-900 dark:text-white">
+                    {selectedGuruForRole.nama}
+                  </p>
+                  <p className="truncate font-mono text-[10px] text-zinc-500 dark:text-zinc-400">
+                    {selectedGuruForRole.noPegawai || 'NIP-1001'} · {selectedGuruForRole.email}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label className={LABEL}>Pilih Peran Baru</label>
+                <div className="space-y-2">
+                  <label
+                    className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition-all duration-300 ${
+                      targetRole === 'guru'
+                        ? 'border-sky-500/30 bg-sky-500/[0.06]'
+                        : 'border-black/[0.07] hover:bg-black/[0.02] dark:border-white/10 dark:hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="targetRole"
+                      value="guru"
+                      checked={targetRole === 'guru'}
+                      onChange={() => setTargetRole('guru')}
+                      className="mt-1 h-3.5 w-3.5 text-sky-600 focus:ring-sky-500/30"
+                    />
+                    <div className="min-w-0">
+                      <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-900 dark:text-white">
+                        <GraduationCap className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />
+                        Guru Biasa
+                      </span>
+                      <span className="mt-1 block text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                        Akses jadwal mengajar dan daftar siswa yang diajar.
+                      </span>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition-all duration-300 ${
+                      targetRole === 'cabang'
+                        ? 'border-amber-500/30 bg-amber-500/[0.06]'
+                        : 'border-black/[0.07] hover:bg-black/[0.02] dark:border-white/10 dark:hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="targetRole"
+                      value="cabang"
+                      checked={targetRole === 'cabang'}
+                      onChange={() => setTargetRole('cabang')}
+                      className="mt-1 h-3.5 w-3.5 text-amber-600 focus:ring-amber-500/30"
+                    />
+                    <div className="min-w-0">
+                      <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-900 dark:text-white">
+                        <Building2 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                        Pimpinan Cabang
+                      </span>
+                      <span className="mt-1 block text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                        Akses penuh manajemen pendaftaran, siswa, keuangan, dan jadwal cabang.
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {targetRole === 'cabang' && (
+                <div>
+                  <label className={LABEL}>Lokasi Cabang yang Dipimpin</label>
+                  <select
+                    value={targetCabangId}
+                    onChange={(e) => setTargetCabangId(e.target.value)}
+                    className={INPUT}
+                  >
+                    {cabangList.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nama} ({c.alamat})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex flex-col-reverse gap-2 border-t border-black/[0.06] pt-4 dark:border-white/[0.06] sm:flex-row sm:justify-end sm:gap-3">
                 <button
-                  onClick={() => setDetailModalGuru(null)}
-                  className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                  type="button"
+                  onClick={() => setSelectedGuruForRole(null)}
+                  className="cursor-pointer rounded-full px-4 py-2.5 text-xs font-medium text-zinc-500 transition-colors hover:bg-black/[0.03] hover:text-zinc-700 dark:hover:bg-white/[0.05] dark:hover:text-zinc-200"
                 >
-                  <X className="w-4 h-4" />
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="cursor-pointer rounded-full bg-zinc-950 px-5 py-2.5 text-xs font-semibold text-white transition-all duration-300 hover:bg-zinc-800 active:scale-[0.98] dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100"
+                >
+                  Simpan Peran
                 </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
 
-              <div className="space-y-4">
-                <div className="flex items-center gap-3.5 p-4 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200/80 dark:border-white/10">
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold text-base shrink-0 border border-indigo-500/20">
-                    {detailModalGuru.nama.charAt(0)}
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-zinc-900 dark:text-white text-sm">{detailModalGuru.nama}</h4>
-                    <span className="text-indigo-600 dark:text-indigo-400 font-mono font-bold text-xs flex items-center gap-1 mt-0.5">
-                      <IdCard className="w-3.5 h-3.5" /> {detailModalGuru.noPegawai || 'NIP-1001'}
-                    </span>
-                  </div>
+      {/* Detail Guru Modal */}
+      {detailModalGuru && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 backdrop-blur-md sm:p-4">
+          <div role="dialog" aria-modal="true" aria-label="Detail guru" className={`${MODAL} max-w-md`}>
+            <div className="flex items-start justify-between gap-4 border-b border-black/[0.06] px-5 py-5 dark:border-white/[0.06] sm:px-6">
+              <div className="flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-full border border-amber-500/15 bg-amber-500/[0.06] text-amber-600 dark:text-amber-400">
+                  <Eye className="h-4 w-4" strokeWidth={1.75} />
+                </span>
+                <div>
+                  <h3 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-white">
+                    Profil Guru
+                  </h3>
+                  <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
+                    Informasi akun dan penugasan
+                  </p>
                 </div>
+              </div>
+              <button onClick={() => setDetailModalGuru(null)} aria-label="Tutup" className={modalButton}>
+                <X className="h-4 w-4" strokeWidth={1.75} />
+              </button>
+            </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200/80 dark:border-white/10">
-                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500 block mb-1 uppercase font-mono">Jenjang Mengajar</span>
-                    <Badge variant="purple">{getJenjangLabel(detailModalGuru.jenjang)}</Badge>
-                  </div>
-
-                  <div className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200/80 dark:border-white/10">
-                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500 block mb-1 uppercase font-mono">Password (Tgl Lahir)</span>
-                    <span className="font-mono font-bold text-zinc-800 dark:text-zinc-200 text-xs flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-zinc-400" />
-                      {detailModalGuru.tanggalLahir || '1995-01-01'}
-                    </span>
-                  </div>
+            <div className="space-y-4 px-5 py-5 sm:px-6">
+              <div className="flex items-center gap-3.5">
+                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-zinc-950 font-mono text-sm font-semibold text-white dark:bg-white dark:text-zinc-950">
+                  {detailModalGuru.nama.charAt(0)}
                 </div>
-
-                <div className="space-y-3">
-                  <div className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200/80 dark:border-white/10">
-                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500 block mb-1 uppercase font-mono">No. WhatsApp / Telepon</span>
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-zinc-800 dark:text-zinc-200 text-xs font-bold flex items-center gap-1.5">
-                        <Phone className="w-3.5 h-3.5 text-emerald-500" />
-                        {detailModalGuru.noTelp}
-                      </span>
-                      <a
-                        href={`https://wa.me/${detailModalGuru.noTelp.replace(/[^0-9]/g, '')}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline font-bold"
-                      >
-                        Hubungi WA &rarr;
-                      </a>
-                    </div>
-                  </div>
-
-                  <div className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200/80 dark:border-white/10">
-                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500 block mb-1 uppercase font-mono">Alamat Rumah</span>
-                    <span className="text-zinc-700 dark:text-zinc-300 text-xs flex items-start gap-1.5 leading-relaxed">
-                      <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
-                      {detailModalGuru.alamat || 'Alamat belum diisi.'}
+                <div className="min-w-0">
+                  <h4 className="truncate text-sm font-semibold tracking-tight text-zinc-900 dark:text-white">
+                    {detailModalGuru.nama}
+                  </h4>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <span className="flex items-center gap-1 font-mono text-[10px] text-sky-700 dark:text-sky-400">
+                      <IdCard className="h-3 w-3" strokeWidth={1.75} />
+                      {detailModalGuru.noPegawai || 'NIP-1001'}
                     </span>
-                  </div>
-
-                  <div className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200/80 dark:border-white/10 flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] text-zinc-400 dark:text-zinc-500 block mb-0.5 uppercase font-mono">Kapasitas Slot Siswa</span>
-                      <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-xs">
-                        {countTeacherAssignedStudents(detailModalGuru.id, siswaList)} / 6 Siswa Terisi
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">
-                      Cabang: {cabangList.filter((c) => detailModalGuru.cabangIds.includes(c.id)).map((c) => c.nama).join(', ')}
-                    </span>
+                    <Badge
+                      variant={
+                        findAccount(detailModalGuru)?.role === 'cabang' ? 'warning' : 'info'
+                      }
+                    >
+                      {findAccount(detailModalGuru)?.role === 'cabang'
+                        ? 'Pimpinan Cabang'
+                        : 'Guru Biasa'}
+                    </Badge>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-zinc-100 dark:border-white/5 flex justify-end">
+              <div className="divide-y divide-black/[0.05] rounded-2xl border border-black/[0.06] dark:divide-white/[0.05] dark:border-white/[0.06]">
+                <div className="flex items-center justify-between gap-3 px-3.5 py-3">
+                  <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-400">
+                    Jenjang
+                  </span>
+                  <Badge variant="neutral">{getJenjangLabel(detailModalGuru.jenjang)}</Badge>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 px-3.5 py-3">
+                  <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-400">
+                    Tanggal lahir
+                  </span>
+                  <span className="flex items-center gap-1.5 font-mono text-[11px] text-zinc-700 dark:text-zinc-300">
+                    <Calendar className="h-3.5 w-3.5 text-zinc-400" strokeWidth={1.75} />
+                    {detailModalGuru.tanggalLahir || '1995-01-01'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 px-3.5 py-3">
+                  <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-400">
+                    WhatsApp
+                  </span>
+                  <a
+                    href={`https://wa.me/${detailModalGuru.noTelp.replace(/[^0-9]/g, '')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 font-mono text-[11px] font-semibold text-emerald-700 hover:underline dark:text-emerald-400"
+                  >
+                    <Phone className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    {detailModalGuru.noTelp}
+                  </a>
+                </div>
+
+                <div className="flex items-start justify-between gap-4 px-3.5 py-3">
+                  <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-400">
+                    Alamat
+                  </span>
+                  <span className="flex max-w-[65%] items-start gap-1.5 text-right text-[11px] leading-relaxed text-zinc-700 dark:text-zinc-300">
+                    <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-500" strokeWidth={1.75} />
+                    {detailModalGuru.alamat || 'Alamat belum diisi.'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 px-3.5 py-3">
+                  <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-400">
+                    Slot siswa
+                  </span>
+                  <span className="font-mono text-[11px] font-semibold text-sky-700 dark:text-sky-400">
+                    {countTeacherAssignedStudents(detailModalGuru.id, siswaList)} / 6 terisi
+                  </span>
+                </div>
+
+                <div className="flex items-start justify-between gap-4 px-3.5 py-3">
+                  <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-400">
+                    Cabang
+                  </span>
+                  <span className="max-w-[65%] text-right text-[11px] leading-relaxed text-zinc-700 dark:text-zinc-300">
+                    {cabangList
+                      .filter((c) => detailModalGuru.cabangIds.includes(c.id))
+                      .map((c) => c.nama)
+                      .join(', ') || 'Belum ditugaskan'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex justify-end border-t border-black/[0.06] pt-4 dark:border-white/[0.06]">
                 <button
                   type="button"
                   onClick={() => setDetailModalGuru(null)}
-                  className="px-5 py-2 bg-zinc-900 text-white dark:bg-white dark:text-zinc-900 font-semibold rounded-xl text-xs transition-colors cursor-pointer shadow-xs"
+                  className="cursor-pointer rounded-full bg-zinc-950 px-5 py-2.5 text-xs font-semibold text-white transition-all duration-300 hover:bg-zinc-800 active:scale-[0.98] dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100"
                 >
                   Tutup
                 </button>
@@ -717,4 +910,3 @@ export const GuruPusatList: React.FC<GuruPusatListProps> = ({
     </div>
   );
 };
-

@@ -244,6 +244,25 @@ const spec = {
         responses: { 200: { description: 'OK' } },
       },
     },
+    '/api/absensi/qr': {
+      post: {
+        tags: ['Absensi'], summary: 'Buat kode QR absensi (pimpinan cabang). Layar regenerasi tiap 5 detik.',
+        responses: { 200: { description: '{token, expiresInMs}' }, 403: { description: 'Khusus cabang' } },
+      },
+    },
+    '/api/absensi/scan': {
+      post: {
+        tags: ['Absensi'], summary: 'Guru absen: scan pertama = datang, kedua = pulang',
+        requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['token'], properties: { token: { type: 'string', example: 'AB12CD34' } } } } } },
+        responses: { 200: { description: '{ok, status, nama}' }, 400: { description: 'QR kadaluarsa/salah' } },
+      },
+    },
+    '/api/absensi/hari-ini': {
+      get: {
+        tags: ['Absensi'], summary: 'Rekap absensi hari ini (pimpinan cabang)',
+        responses: { 200: { description: 'OK' } },
+      },
+    },
   },
 };
 

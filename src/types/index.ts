@@ -124,3 +124,13 @@ export interface AuditLog {
   action: string;
   details: string;
 }
+
+export interface Absensi {
+  id: string;
+  userId: string;
+  cabangId: string;
+  nama: string;
+  tanggal: string; // YYYY-MM-DD
+  jamDatang?: string | null; // ISO datetime
+  jamPulang?: string | null;
+}
